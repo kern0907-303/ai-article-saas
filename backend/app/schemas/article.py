@@ -1,0 +1,50 @@
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+
+class ArticleGenerateRequest(BaseModel):
+    topic: str = Field(min_length=1, max_length=255)
+    outline: str = Field(min_length=1)
+    selected_file_ids: list[int] = []
+    model: str = "gpt-4.1-mini"
+    prompt: str | None = None
+
+
+class PromptExpandRequest(BaseModel):
+    requirement: str = Field(min_length=1, max_length=500)
+    model: str = "gpt-4.1-mini"
+
+
+class PromptExpandResponse(BaseModel):
+    prompt: str
+
+
+class ArticleUpdateRequest(BaseModel):
+    content: str = Field(min_length=1)
+
+
+class ArticleOut(BaseModel):
+    id: int
+    user_id: str
+    topic: str
+    outline: str
+    content: str | None
+    selected_file_ids: str | None
+    generation_model: str | None
+    generation_status: str
+    published_to_website: bool
+    published_to_social: bool
+    publish_website_result: str | None
+    publish_social_result: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PublishResponse(BaseModel):
+    success: bool
+    channel: str
+    message: str
+    article_id: int

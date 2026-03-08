@@ -1,0 +1,397 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+import { api } from "@/lib/api";
+import { Article, ArticleImage, ImageStylePreset, KnowledgeFile } from "@/lib/types";
+
+const PROMPT_TEMPLATES = [
+  {
+    key: "blogger",
+    label: "部落客深度分享風格",
+    value:
+      "你是一位有個人特色的專業部落客。請用自然、有溫度且容易閱讀的語氣寫作，先用生活化情境破題，再逐步展開重點。文章需兼具故事感與實用性，包含：吸引人的標題、開場鉤子、3-5 個核心觀點、可立即行動的建議、結尾互動提問。請避免空泛口號，讓讀者看完就想收藏與分享。",
+  },
+  {
+    key: "expert",
+    label: "專家觀點權威解析",
+    value:
+      "你是該領域的資深專家與顧問。請以嚴謹、可信、可驗證的方式分析主題，先定義問題，再拆解成原理、方法、案例與風險。內容需包含：關鍵術語解釋、常見誤區、決策建議、評估指標與落地步驟。語氣專業但不艱澀，避免誇大與無根據結論，讓讀者能用於實務判斷。",
+  },
+  {
+    key: "emotion",
+    label: "情感抒發共鳴文章",
+    value:
+      "請用細膩真誠的筆觸撰寫一篇情感抒發文章，重點是「真實感」與「共鳴感」。結構建議：一段具體情境開場、內在情緒拉扯、轉折反思、溫柔收束。避免過度灑狗血或說教，改用可感知的細節與節制語言表達，讓讀者覺得被理解、被陪伴。",
+  },
+  {
+    key: "knowledge",
+    label: "知識與認知升級分享",
+    value:
+      "請以「認知升級 + 知識轉譯」方式寫作，幫助一般讀者快速理解複雜主題。先講清楚為何重要，再用比喻、框架與實例拆解，最後整理成可執行清單。內容需包含：核心概念、常見迷思、判斷框架、實戰情境、下一步行動。語氣清楚、有邏輯、不賣弄術語，重點是讓讀者看完能真正學會並應用。",
+  },
+];
+
+export default function ArticlesPage() {
+  const [files, setFiles] = useState<KnowledgeFile[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [images, setImages] = useState<ArticleImage[]>([]);
+  const [stylePresets, setStylePresets] = useState<ImageStylePreset[]>([]);
+  const [selectedImageStyle, setSelectedImageStyle] = useState("blog_cover");
+  const [needTextOverlay, setNeedTextOverlay] = useState(true);
+  const [imageTextLanguage, setImageTextLanguage] = useState("zh-Hant");
+  const [imageTextContent, setImageTextContent] = useState("");
+
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [topic, setTopic] = useState("");
+  const [outline, setOutline] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [promptRequirement, setPromptRequirement] = useState("");
+  const [templateKey, setTemplateKey] = useState("");
+  const [content, setContent] = useState("");
+  const [currentArticleId, setCurrentArticleId] = useState<number | null>(null);
+  const [status, setStatus] = useState("");
+
+  const currentArticle = useMemo(
+    () => articles.find((item) => item.id === currentArticleId) || null,
+    [articles, currentArticleId],
+  );
+
+  const load = async () => {
+    const [fileList, articleList, presets] = await Promise.all([
+      api.listFiles(),
+      api.listArticles(),
+      api.getImageStylePresets(),
+    ]);
+    setFiles(fileList);
+    setSelectedIds((prev) =>
+      prev.length > 0 ? prev : fileList.filter((file) => file.is_default_reference).map((file) => file.id),
+    );
+    setArticles(articleList);
+    setStylePresets(presets);
+
+    const newest = articleList[0];
+    if (newest && !currentArticleId) {
+      setCurrentArticleId(newest.id);
+      const imageList = await api.listArticleImages(newest.id);
+      setImages(imageList);
+    }
+  };
+
+  useEffect(() => {
+    load().catch((err: Error) => setStatus(`初始化失敗：${err.message}`));
+  }, []);
+
+  const refreshImages = async (articleId: number) => {
+    const imageList = await api.listArticleImages(articleId);
+    setImages(imageList);
+  };
+
+  const toggleFile = (id: number) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const onSelectTemplate = (value: string) => {
+    setTemplateKey(value);
+    const selected = PROMPT_TEMPLATES.find((template) => template.key === value);
+    if (selected) {
+      setPrompt(selected.value);
+    }
+  };
+
+  const expandPrompt = async () => {
+    if (!promptRequirement.trim()) {
+      setStatus("請先輸入一句話需求");
+      return;
+    }
+
+    setStatus("提示詞擴寫中...");
+    try {
+      const result = await api.expandPrompt({ requirement: promptRequirement.trim() });
+      setPrompt(result.prompt);
+      setStatus("提示詞生成成功");
+    } catch (err) {
+      setStatus(`提示詞擴寫失敗：${(err as Error).message}`);
+    }
+  };
+
+  const generate = async () => {
+    if (!topic || !outline) {
+      setStatus("請輸入主題與大綱");
+      return;
+    }
+
+    setStatus("生成中...");
+    try {
+      const article = await api.generateArticle({
+        topic,
+        outline,
+        selected_file_ids: selectedIds,
+        prompt: prompt || undefined,
+      });
+      setContent(article.content || "");
+      setCurrentArticleId(article.id);
+      setStatus("生成成功");
+      await load();
+      await refreshImages(article.id);
+    } catch (err) {
+      setStatus(`生成失敗：${(err as Error).message}`);
+    }
+  };
+
+  const generateImages = async () => {
+    if (!currentArticleId) {
+      setStatus("請先生成文章");
+      return;
+    }
+
+    setStatus("生成配圖中...");
+    try {
+      const result = await api.generateArticleImages(currentArticleId, {
+        style_preset: selectedImageStyle,
+        custom_prompt: prompt,
+        need_text_overlay: needTextOverlay,
+        text_language: imageTextLanguage,
+        text_content: imageTextContent || topic,
+      });
+      setImages(result);
+      setStatus("圖片生成成功（中文文字需求會自動走 nano banana）");
+    } catch (err) {
+      setStatus(`生成圖片失敗：${(err as Error).message}`);
+    }
+  };
+
+  const saveContent = async () => {
+    if (!currentArticleId) {
+      setStatus("請先生成文章");
+      return;
+    }
+
+    setStatus("儲存中...");
+    try {
+      const updated = await api.updateArticle(currentArticleId, content);
+      setStatus("儲存成功");
+      setArticles((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    } catch (err) {
+      setStatus(`儲存失敗：${(err as Error).message}`);
+    }
+  };
+
+  const publish = async (channel: "website" | "social") => {
+    if (!currentArticleId) {
+      setStatus("請先生成文章");
+      return;
+    }
+    setStatus("發布中...");
+
+    try {
+      const result =
+        channel === "website" ? await api.publishWebsite(currentArticleId) : await api.publishSocial(currentArticleId);
+      setStatus(result.message);
+      await load();
+    } catch (err) {
+      setStatus(`發布失敗：${(err as Error).message}`);
+    }
+  };
+
+  return (
+    <section className="space-y-5 max-w-6xl">
+      <div className="card-surface p-6 space-y-2">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-2xl font-bold">文章創作與發布</h2>
+          <span className="brand-pill">Tiffany Blue Workflow</span>
+        </div>
+        <p className="text-slate-700">從提示詞、生成、編修到發布，一頁完成內容工作流。</p>
+      </div>
+
+      <div className="card-surface p-6 space-y-4">
+        <h3 className="text-lg font-semibold">區塊一：輸入生成條件</h3>
+
+        <div>
+          <p className="text-sm font-medium mb-1">選擇參考檔案</p>
+          <div className="flex flex-wrap gap-2">
+            {files.map((file) => (
+              <button
+                key={file.id}
+                type="button"
+                onClick={() => toggleFile(file.id)}
+                className={`rounded-full border px-3 py-1 text-sm transition ${
+                  selectedIds.includes(file.id)
+                    ? "bg-[#0abab5] text-white border-[#0abab5]"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-[#f0fbfa]"
+                }`}
+              >
+                {file.file_name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <label className="block text-sm font-medium">
+          選擇提示詞範本
+          <select
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            value={templateKey}
+            onChange={(e) => onSelectTemplate(e.target.value)}
+          >
+            <option value="">請選擇範本</option>
+            {PROMPT_TEMPLATES.map((template) => (
+              <option key={template.key} value={template.key}>
+                {template.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-2">
+          <label className="block text-sm font-medium">
+            一句話需求（AI 會幫你擴寫成精準提示詞）
+            <input
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+              value={promptRequirement}
+              onChange={(e) => setPromptRequirement(e.target.value)}
+              placeholder="例如：我要寫給中小企業老闆看的品牌定位教學"
+            />
+          </label>
+          <button type="button" onClick={expandPrompt} className="brand-btn-secondary px-4 py-2">
+            生成精準提示詞
+          </button>
+        </div>
+
+        <label className="block text-sm font-medium">
+          主要提示詞
+          <textarea
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            rows={5}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="可手動輸入，或用上方範本/擴寫功能自動帶入"
+          />
+        </label>
+
+        <label className="block text-sm font-medium">
+          主題
+          <input
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+          />
+        </label>
+
+        <label className="block text-sm font-medium">
+          大綱
+          <textarea
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            rows={6}
+            value={outline}
+            onChange={(e) => setOutline(e.target.value)}
+          />
+        </label>
+
+        <button onClick={generate} className="brand-btn px-4 py-2">
+          生成文章
+        </button>
+      </div>
+
+      <div className="card-surface p-6 space-y-4">
+        <h3 className="text-lg font-semibold">區塊二：文章編輯區</h3>
+        <textarea
+          className="w-full min-h-[360px] rounded-lg border border-slate-300 p-3"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="生成結果會顯示在此，可手動編輯"
+        />
+        <button onClick={saveContent} className="brand-btn-secondary px-4 py-2">
+          儲存修改
+        </button>
+      </div>
+
+      <div className="card-surface p-6 space-y-4">
+        <h3 className="text-lg font-semibold">區塊三：發布 + 配圖</h3>
+
+        <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">
+          <p className="text-sm font-semibold text-[#0f766e]">AI 圖片生成（中文文字需求自動走 nano banana）</p>
+          <div className="grid md:grid-cols-2 gap-3">
+            <label className="block text-sm font-medium">
+              圖片風格
+              <select
+                className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+                value={selectedImageStyle}
+                onChange={(e) => setSelectedImageStyle(e.target.value)}
+              >
+                {stylePresets.map((preset) => (
+                  <option key={preset.key} value={preset.key}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-medium">
+              文字語言
+              <select
+                className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+                value={imageTextLanguage}
+                onChange={(e) => setImageTextLanguage(e.target.value)}
+              >
+                <option value="zh-Hant">繁體中文</option>
+                <option value="en">英文</option>
+                <option value="none">無文字</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={needTextOverlay} onChange={(e) => setNeedTextOverlay(e.target.checked)} />
+            圖片需要文字排版
+          </label>
+
+          <label className="block text-sm font-medium">
+            圖上文字內容
+            <input
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+              value={imageTextContent}
+              onChange={(e) => setImageTextContent(e.target.value)}
+              placeholder="例如：AI 內容工作流完整指南"
+            />
+          </label>
+
+          <button onClick={generateImages} className="brand-btn px-4 py-2">
+            生成相符配圖
+          </button>
+        </div>
+
+        {images.length > 0 && (
+          <div className="grid md:grid-cols-2 gap-3">
+            {images.map((image) => (
+              <div key={image.id} className="rounded-xl border border-[var(--line)] bg-white p-3 space-y-2">
+                <img src={image.image_url} alt={`article-image-${image.id}`} className="w-full rounded-lg border border-slate-200" />
+                <p className="text-xs text-slate-600">
+                  provider: {image.provider} / model: {image.model}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-3 flex-wrap">
+          <button onClick={() => publish("website")} className="brand-btn px-4 py-2">
+            發布至個人網頁
+          </button>
+          <button onClick={() => publish("social")} className="brand-btn-secondary px-4 py-2">
+            發布至社交平台
+          </button>
+        </div>
+
+        {currentArticle && (
+          <p className="text-sm text-slate-600">
+            目前文章狀態：網頁 {currentArticle.published_to_website ? "已發布" : "未發布"} / 社交平台{" "}
+            {currentArticle.published_to_social ? "已發布" : "未發布"}
+          </p>
+        )}
+
+        {status && <p className="text-sm text-slate-700">{status}</p>}
+      </div>
+    </section>
+  );
+}

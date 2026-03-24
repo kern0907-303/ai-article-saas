@@ -3,6 +3,7 @@ import httpx
 from app.models.settings import Setting
 
 SUPPORTED_TEXT_PROVIDERS = {"openai", "anthropic", "gemini", "github"}
+PROVIDER_TIMEOUT_SECONDS = 75
 
 
 def build_article_prompt(topic: str, outline: str, contexts: list[str], user_prompt: str | None = None) -> str:
@@ -75,19 +76,30 @@ def _extract_error_message(response: httpx.Response) -> str:
     return response.text.strip() or f"HTTP {response.status_code}"
 
 
+def _provider_request_error(provider_label: str, err: Exception) -> RuntimeError:
+    if isinstance(err, httpx.TimeoutException):
+        return RuntimeError(f"{provider_label} 回應逾時，請稍後再試，或改用較快的模型")
+    if isinstance(err, httpx.HTTPError):
+        return RuntimeError(f"{provider_label} 連線失敗，請稍後再試")
+    return RuntimeError(str(err))
+
+
 def _openai_generate(*, api_key: str, model: str, prompt: str) -> str:
-    response = httpx.post(
-        "https://api.openai.com/v1/responses",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": model,
-            "input": prompt,
-        },
-        timeout=60,
-    )
+    try:
+        response = httpx.post(
+            "https://api.openai.com/v1/responses",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model,
+                "input": prompt,
+            },
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+        )
+    except Exception as err:
+        raise _provider_request_error("OpenAI", err) from err
     if response.is_error:
         raise RuntimeError(_extract_error_message(response))
 
@@ -109,20 +121,23 @@ def _openai_generate(*, api_key: str, model: str, prompt: str) -> str:
 
 
 def _anthropic_generate(*, api_key: str, model: str, prompt: str) -> str:
-    response = httpx.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-        json={
-            "model": model,
-            "max_tokens": 4096,
-            "messages": [{"role": "user", "content": prompt}],
-        },
-        timeout=60,
-    )
+    try:
+        response = httpx.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": model,
+                "max_tokens": 4096,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+        )
+    except Exception as err:
+        raise _provider_request_error("Anthropic", err) from err
     if response.is_error:
         raise RuntimeError(_extract_error_message(response))
 
@@ -137,20 +152,23 @@ def _anthropic_generate(*, api_key: str, model: str, prompt: str) -> str:
 
 
 def _gemini_generate(*, api_key: str, model: str, prompt: str) -> str:
-    response = httpx.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        params={"key": api_key},
-        headers={"Content-Type": "application/json"},
-        json={
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": prompt}],
-                }
-            ],
-        },
-        timeout=60,
-    )
+    try:
+        response = httpx.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            params={"key": api_key},
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": prompt}],
+                    }
+                ],
+            },
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+        )
+    except Exception as err:
+        raise _provider_request_error("Gemini", err) from err
     if response.is_error:
         raise RuntimeError(_extract_error_message(response))
 
@@ -171,21 +189,24 @@ def _gemini_generate(*, api_key: str, model: str, prompt: str) -> str:
 
 
 def _github_generate(*, api_key: str, model: str, prompt: str) -> str:
-    response = httpx.post(
-        "https://models.github.ai/inference/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
-        json={
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.7,
-        },
-        timeout=60,
-    )
+    try:
+        response = httpx.post(
+            "https://models.github.ai/inference/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+            },
+            timeout=PROVIDER_TIMEOUT_SECONDS,
+        )
+    except Exception as err:
+        raise _provider_request_error("GitHub Models", err) from err
     if response.is_error:
         raise RuntimeError(_extract_error_message(response))
 

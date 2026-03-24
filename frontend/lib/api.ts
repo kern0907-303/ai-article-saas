@@ -17,7 +17,7 @@ import {
   Subscription,
 } from "@/lib/types";
 
-const REQUEST_TIMEOUT_MS = 20000;
+const REQUEST_TIMEOUT_MS = 90000;
 
 function resolveApiBase(): string {
   const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
@@ -65,7 +65,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     });
   } catch (err) {
     if ((err as Error).name === "AbortError") {
-      throw new Error("請求逾時，請檢查網路或稍後再試");
+      throw new Error("請求逾時。AI 生成可能需要較久時間，請稍後再試，或改用較快的模型。");
     }
     throw new Error("無法連線到後端 API，請確認前端與後端都已啟動，且後端位址設定正確");
   } finally {

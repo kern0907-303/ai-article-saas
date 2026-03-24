@@ -1,10 +1,11 @@
 export type Settings = {
   id: number;
   user_id: string;
-  ai_provider: "openai" | "anthropic" | "gemini";
+  ai_provider: "openai" | "anthropic" | "gemini" | "github";
   openai_api_key?: string;
   anthropic_api_key?: string;
   gemini_api_key?: string;
+  github_api_key?: string;
   website_api_key?: string;
   social_api_key?: string;
   article_model: string;

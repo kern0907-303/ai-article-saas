@@ -16,12 +16,14 @@ class Setting(BaseModel):
     openai_api_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     anthropic_api_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     gemini_api_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    github_api_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     website_api_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
     social_api_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     openai_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     anthropic_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     gemini_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    github_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     website_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     social_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
 

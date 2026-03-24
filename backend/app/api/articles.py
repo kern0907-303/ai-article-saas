@@ -28,6 +28,7 @@ def _hydrate_provider_keys(setting: Setting) -> Setting:
     setting.openai_api_key = decrypt_text(setting.openai_api_key_encrypted) or setting.openai_api_key
     setting.anthropic_api_key = decrypt_text(setting.anthropic_api_key_encrypted) or setting.anthropic_api_key
     setting.gemini_api_key = decrypt_text(setting.gemini_api_key_encrypted) or setting.gemini_api_key
+    setting.github_api_key = decrypt_text(setting.github_api_key_encrypted) or setting.github_api_key
     return setting
 
 

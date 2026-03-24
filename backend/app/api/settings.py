@@ -60,6 +60,22 @@ MODEL_CATALOG: list[ModelCatalogItem] = [
         cost_tier="high",
     ),
     ModelCatalogItem(
+        key="openai/gpt-4.1-mini",
+        provider="github",
+        category="text",
+        label="GitHub Models: GPT-4.1 Mini",
+        description="透過 GitHub Models 使用 OpenAI 的輕量模型",
+        cost_tier="low",
+    ),
+    ModelCatalogItem(
+        key="openai/gpt-4.1",
+        provider="github",
+        category="text",
+        label="GitHub Models: GPT-4.1",
+        description="透過 GitHub Models 使用 OpenAI 的高品質模型",
+        cost_tier="high",
+    ),
+    ModelCatalogItem(
         key="gpt-image-1",
         provider="openai",
         category="image",
@@ -86,6 +102,7 @@ def _out_from_setting(record: Setting) -> SettingsOut:
         openai_api_key=decrypt_text(record.openai_api_key_encrypted) or record.openai_api_key,
         anthropic_api_key=decrypt_text(record.anthropic_api_key_encrypted) or record.anthropic_api_key,
         gemini_api_key=decrypt_text(record.gemini_api_key_encrypted) or record.gemini_api_key,
+        github_api_key=decrypt_text(record.github_api_key_encrypted) or record.github_api_key,
         website_api_key=decrypt_text(record.website_api_key_encrypted) or record.website_api_key,
         social_api_key=decrypt_text(record.social_api_key_encrypted) or record.social_api_key,
         article_model=record.article_model,
@@ -127,6 +144,7 @@ def upsert_settings(
     record.openai_api_key_encrypted = encrypt_text(data.get("openai_api_key"))
     record.anthropic_api_key_encrypted = encrypt_text(data.get("anthropic_api_key"))
     record.gemini_api_key_encrypted = encrypt_text(data.get("gemini_api_key"))
+    record.github_api_key_encrypted = encrypt_text(data.get("github_api_key"))
     record.website_api_key_encrypted = encrypt_text(data.get("website_api_key"))
     record.social_api_key_encrypted = encrypt_text(data.get("social_api_key"))
 
@@ -134,6 +152,7 @@ def upsert_settings(
     record.openai_api_key = None
     record.anthropic_api_key = None
     record.gemini_api_key = None
+    record.github_api_key = None
     record.website_api_key = None
     record.social_api_key = None
 

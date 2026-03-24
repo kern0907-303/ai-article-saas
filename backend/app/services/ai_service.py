@@ -2,7 +2,7 @@ import httpx
 
 from app.models.settings import Setting
 
-SUPPORTED_TEXT_PROVIDERS = {"openai", "anthropic", "gemini"}
+SUPPORTED_TEXT_PROVIDERS = {"openai", "anthropic", "gemini", "github"}
 
 
 def build_article_prompt(topic: str, outline: str, contexts: list[str], user_prompt: str | None = None) -> str:
@@ -57,6 +57,8 @@ def resolve_text_provider_api_key(setting: Setting, provider: str) -> str | None
         return setting.anthropic_api_key
     if provider == "gemini":
         return setting.gemini_api_key
+    if provider == "github":
+        return setting.github_api_key
     return None
 
 
@@ -168,6 +170,39 @@ def _gemini_generate(*, api_key: str, model: str, prompt: str) -> str:
     raise RuntimeError("Gemini 未回傳可用文字內容")
 
 
+def _github_generate(*, api_key: str, model: str, prompt: str) -> str:
+    response = httpx.post(
+        "https://models.github.ai/inference/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        json={
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+        },
+        timeout=60,
+    )
+    if response.is_error:
+        raise RuntimeError(_extract_error_message(response))
+
+    data = response.json()
+    for choice in data.get("choices", []):
+        if not isinstance(choice, dict):
+            continue
+        message = choice.get("message", {})
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+
+    raise RuntimeError("GitHub Models 未回傳可用文字內容")
+
+
 def generate_text_with_provider(*, provider: str, api_key: str, model: str, prompt: str) -> str:
     normalized_provider = normalize_text_provider(provider)
     if normalized_provider == "openai":
@@ -176,6 +211,8 @@ def generate_text_with_provider(*, provider: str, api_key: str, model: str, prom
         return _anthropic_generate(api_key=api_key, model=model, prompt=prompt)
     if normalized_provider == "gemini":
         return _gemini_generate(api_key=api_key, model=model, prompt=prompt)
+    if normalized_provider == "github":
+        return _github_generate(api_key=api_key, model=model, prompt=prompt)
     raise ValueError(f"目前不支援的文字模型供應商：{provider}")
 
 
@@ -189,6 +226,7 @@ def _require_provider_key(user_setting: Setting, provider: str) -> str:
         "openai": "OpenAI",
         "anthropic": "Anthropic",
         "gemini": "Gemini",
+        "github": "GitHub Models",
     }[normalized_provider]
     raise ValueError(f"尚未設定 {provider_label} API Key，無法使用目前選擇的供應商。")
 

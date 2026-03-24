@@ -26,6 +26,12 @@ const PROVIDER_DEFAULTS: Record<Settings["ai_provider"], { article: string; prom
     keyHint: "使用 Google AI Studio 或 Gemini API 發出的 API Key。",
     keyPlaceholder: "AIza...",
   },
+  github: {
+    article: "openai/gpt-4.1",
+    prompt: "openai/gpt-4.1-mini",
+    keyHint: "使用 GitHub token，並確認具備 GitHub Models 所需權限。",
+    keyPlaceholder: "ghp_... / github_pat_...",
+  },
 };
 
 export default function SettingsPage() {
@@ -34,6 +40,7 @@ export default function SettingsPage() {
     openai_api_key: "",
     anthropic_api_key: "",
     gemini_api_key: "",
+    github_api_key: "",
     website_api_key: "",
     social_api_key: "",
     article_model: "gpt-4.1-mini",
@@ -56,6 +63,7 @@ export default function SettingsPage() {
             openai_api_key: settingsData.openai_api_key || "",
             anthropic_api_key: settingsData.anthropic_api_key || "",
             gemini_api_key: settingsData.gemini_api_key || "",
+            github_api_key: settingsData.github_api_key || "",
             website_api_key: settingsData.website_api_key || "",
             social_api_key: settingsData.social_api_key || "",
             article_model: settingsData.article_model || "gpt-4.1-mini",
@@ -142,6 +150,7 @@ export default function SettingsPage() {
             <option value="openai">OpenAI</option>
             <option value="anthropic">Anthropic</option>
             <option value="gemini">Gemini</option>
+            <option value="github">GitHub Models</option>
           </select>
           <p className="mt-1 text-xs text-slate-500">文章生成與提示詞擴寫會依這裡選的供應商切換。</p>
         </label>
@@ -174,6 +183,16 @@ export default function SettingsPage() {
           linkText="👉 前往 Google AI Studio 建立 API Key"
           linkHref="/help/api-setup#ai-key"
           placeholder="AIza..."
+        />
+
+        <Input
+          label="GitHub Models Token"
+          value={form.github_api_key}
+          onChange={(v) => setForm({ ...form, github_api_key: v })}
+          hint={form.ai_provider === "github" ? providerConfig.keyHint : "選填。切換到 GitHub Models 時會使用這組 token。"}
+          linkText="👉 查看 GitHub Models token 與權限說明"
+          linkHref="/help/api-setup#ai-key"
+          placeholder="ghp_... / github_pat_..."
         />
 
         <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">

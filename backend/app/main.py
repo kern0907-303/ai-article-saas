@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import articles, auth, billing, images, knowledge_files, publish, settings
+from app.api import admin, articles, auth, billing, images, knowledge_files, publish, settings
 from app.core.config import settings as app_settings
 from app.core.database import Base, engine
 from app.core.migrations import run_startup_migrations
@@ -38,12 +38,20 @@ def root():
 
 @app.get("/healthz")
 def healthz():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "database_backend": "sqlite" if app_settings.database_url.startswith("sqlite") else "server",
+        "storage_dir": str(app_settings.storage_dir),
+        "persistent_storage_enabled": app_settings.persistent_storage_enabled,
+    }
 
 
 @app.get("/readyz")
 def readyz():
-    return {"status": "ready"}
+    return {
+        "status": "ready",
+        "database_backend": "sqlite" if app_settings.database_url.startswith("sqlite") else "server",
+    }
 
 
 @app.middleware("http")
@@ -74,3 +82,4 @@ app.include_router(knowledge_files.router, prefix=app_settings.api_prefix)
 app.include_router(articles.router, prefix=app_settings.api_prefix)
 app.include_router(images.router, prefix=app_settings.api_prefix)
 app.include_router(publish.router, prefix=app_settings.api_prefix)
+app.include_router(admin.router, prefix=app_settings.api_prefix)

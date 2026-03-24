@@ -1,13 +1,44 @@
+import os
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _default_runtime_root() -> Path:
+    render_disk_path = os.getenv("RENDER_DISK_PATH", "").strip()
+    if render_disk_path:
+        return Path(render_disk_path) / "ai-article-saas"
+
+    if os.getenv("RENDER", "").strip().lower() == "true":
+        return Path("/var/data/ai-article-saas")
+
+    return Path(".")
+
+
+def _default_database_url() -> str:
+    configured = os.getenv("DATABASE_URL", "").strip()
+    if configured:
+        if configured.startswith("postgres://"):
+            return configured.replace("postgres://", "postgresql://", 1)
+        return configured
+
+    runtime_root = _default_runtime_root()
+    return f"sqlite:///{(runtime_root / 'app.db').resolve()}"
+
+
+def _default_storage_dir() -> Path:
+    configured = os.getenv("STORAGE_DIR", "").strip()
+    if configured:
+        return Path(configured)
+    return _default_runtime_root() / "storage"
 
 
 class AppSettings(BaseSettings):
     app_name: str = "AI 文章生成與自動發布 SaaS API"
     api_prefix: str = "/api"
-    database_url: str = "sqlite:///./app.db"
-    storage_dir: Path = Path("storage")
+    database_url: str = _default_database_url()
+    storage_dir: Path = _default_storage_dir()
     cors_origins: str = "*"
 
     jwt_secret_key: str = "change-this-in-production"
@@ -17,7 +48,21 @@ class AppSettings(BaseSettings):
     encryption_secret: str = "replace-with-32-byte-base64-key"
 
     expose_reset_token_in_response: bool = True
+    admin_api_key: str = "change-admin-key-in-production"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        if isinstance(value, str) and value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql://", 1)
+        return value
+
+    @property
+    def persistent_storage_enabled(self) -> bool:
+        if not self.database_url.startswith("sqlite"):
+            return True
+        return bool(os.getenv("RENDER_DISK_PATH", "").strip())
 
 
 settings = AppSettings()

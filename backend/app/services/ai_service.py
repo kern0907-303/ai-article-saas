@@ -35,6 +35,7 @@ def build_article_prompt(topic: str, outline: str, contexts: list[str], user_pro
 4. 請輸出純文字格式，不要使用 Markdown。
 5. 不要輸出 `#`、`##`、`###`、`**`、`__` 這類 Markdown 符號。
 6. 標題與小節請直接用一般文字換行呈現。
+7. 不要輸出 ```markdown、```、---、1. 這類格式符號。
 """.strip()
 
 
@@ -325,7 +326,14 @@ def expand_prompt(
 
 
 def sanitize_generated_article(content: str) -> str:
-    sanitized = content.replace("**", "").replace("__", "")
+    sanitized = content.strip()
+    sanitized = re.sub(r"^```[\w-]*\s*\n?", "", sanitized)
+    sanitized = re.sub(r"\n?```\s*$", "", sanitized)
+    sanitized = sanitized.replace("```markdown", "").replace("```", "")
+    sanitized = sanitized.replace("**", "").replace("__", "").replace("`", "")
     sanitized = re.sub(r"(?m)^\s*#{1,6}\s*", "", sanitized)
+    sanitized = re.sub(r"(?m)^\s*[-*_]{3,}\s*$", "", sanitized)
+    sanitized = re.sub(r"(?m)^\s*(\d+)\.\s+", "", sanitized)
+    sanitized = re.sub(r"(?m)^\s*[-*+]\s+", "", sanitized)
     sanitized = re.sub(r"\n{3,}", "\n\n", sanitized)
     return sanitized.strip()

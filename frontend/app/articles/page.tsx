@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { api } from "@/lib/api";
-import { Article, ArticleImage, ImageStylePreset, KnowledgeFile } from "@/lib/types";
+import { Article, ArticleImage, Entitlements, ImageStylePreset, KnowledgeFile } from "@/lib/types";
 
 const PROMPT_TEMPLATES = [
   {
@@ -36,6 +37,7 @@ export default function ArticlesPage() {
   const [files, setFiles] = useState<KnowledgeFile[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [images, setImages] = useState<ArticleImage[]>([]);
+  const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [stylePresets, setStylePresets] = useState<ImageStylePreset[]>([]);
   const [selectedImageStyle, setSelectedImageStyle] = useState("blog_cover");
   const [needTextOverlay, setNeedTextOverlay] = useState(true);
@@ -51,6 +53,11 @@ export default function ArticlesPage() {
   const [content, setContent] = useState("");
   const [currentArticleId, setCurrentArticleId] = useState<number | null>(null);
   const [status, setStatus] = useState("");
+  const [loadingPrompt, setLoadingPrompt] = useState(false);
+  const [loadingArticle, setLoadingArticle] = useState(false);
+  const [loadingImages, setLoadingImages] = useState(false);
+  const [savingContent, setSavingContent] = useState(false);
+  const [publishingChannel, setPublishingChannel] = useState<"website" | "social" | null>(null);
 
   const currentArticle = useMemo(
     () => articles.find((item) => item.id === currentArticleId) || null,
@@ -58,23 +65,33 @@ export default function ArticlesPage() {
   );
 
   const load = async () => {
-    const [fileList, articleList, presets] = await Promise.all([
-      api.listFiles(),
-      api.listArticles(),
-      api.getImageStylePresets(),
-    ]);
+    const [presets, entitlementData] = await Promise.all([api.getImageStylePresets(), api.getEntitlements()]);
+    setStylePresets(presets);
+    setEntitlements(entitlementData);
+
+    if (!entitlementData.is_active) {
+      setFiles([]);
+      setArticles([]);
+      setImages([]);
+      setCurrentArticleId(null);
+      return;
+    }
+
+    const [fileList, articleList] = await Promise.all([api.listFiles(), api.listArticles()]);
     setFiles(fileList);
     setSelectedIds((prev) =>
       prev.length > 0 ? prev : fileList.filter((file) => file.is_default_reference).map((file) => file.id),
     );
     setArticles(articleList);
-    setStylePresets(presets);
 
     const newest = articleList[0];
     if (newest && !currentArticleId) {
       setCurrentArticleId(newest.id);
       const imageList = await api.listArticleImages(newest.id);
       setImages(imageList);
+      setContent(newest.content || "");
+    } else if (!newest) {
+      setImages([]);
     }
   };
 
@@ -106,12 +123,15 @@ export default function ArticlesPage() {
     }
 
     setStatus("提示詞擴寫中...");
+    setLoadingPrompt(true);
     try {
       const result = await api.expandPrompt({ requirement: promptRequirement.trim() });
       setPrompt(result.prompt);
       setStatus("提示詞生成成功");
     } catch (err) {
       setStatus(`提示詞擴寫失敗：${(err as Error).message}`);
+    } finally {
+      setLoadingPrompt(false);
     }
   };
 
@@ -122,6 +142,7 @@ export default function ArticlesPage() {
     }
 
     setStatus("生成中...");
+    setLoadingArticle(true);
     try {
       const article = await api.generateArticle({
         topic,
@@ -136,6 +157,8 @@ export default function ArticlesPage() {
       await refreshImages(article.id);
     } catch (err) {
       setStatus(`生成失敗：${(err as Error).message}`);
+    } finally {
+      setLoadingArticle(false);
     }
   };
 
@@ -146,6 +169,7 @@ export default function ArticlesPage() {
     }
 
     setStatus("生成配圖中...");
+    setLoadingImages(true);
     try {
       const result = await api.generateArticleImages(currentArticleId, {
         style_preset: selectedImageStyle,
@@ -158,6 +182,8 @@ export default function ArticlesPage() {
       setStatus("圖片生成成功（中文文字需求會自動走 nano banana）");
     } catch (err) {
       setStatus(`生成圖片失敗：${(err as Error).message}`);
+    } finally {
+      setLoadingImages(false);
     }
   };
 
@@ -168,12 +194,15 @@ export default function ArticlesPage() {
     }
 
     setStatus("儲存中...");
+    setSavingContent(true);
     try {
       const updated = await api.updateArticle(currentArticleId, content);
       setStatus("儲存成功");
       setArticles((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
     } catch (err) {
       setStatus(`儲存失敗：${(err as Error).message}`);
+    } finally {
+      setSavingContent(false);
     }
   };
 
@@ -183,6 +212,7 @@ export default function ArticlesPage() {
       return;
     }
     setStatus("發布中...");
+    setPublishingChannel(channel);
 
     try {
       const result =
@@ -191,8 +221,13 @@ export default function ArticlesPage() {
       await load();
     } catch (err) {
       setStatus(`發布失敗：${(err as Error).message}`);
+    } finally {
+      setPublishingChannel(null);
     }
   };
+
+  const hasActiveAccess = !!entitlements?.is_active;
+  const showAccessWarning = entitlements !== null && !entitlements.is_active;
 
   return (
     <section className="space-y-5 max-w-6xl">
@@ -203,6 +238,16 @@ export default function ArticlesPage() {
         </div>
         <p className="text-slate-700">從提示詞、生成、編修到發布，一頁完成內容工作流。</p>
       </div>
+
+      {showAccessWarning && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-900">
+          <p className="text-sm font-semibold">目前尚未開通可用方案</p>
+          <p className="mt-1 text-sm">生成提示詞、文章、圖片與發布功能都需要先啟用 7 天試用或完成付款。</p>
+          <Link href="/billing" className="mt-3 inline-flex rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white">
+            前往訂閱與付款
+          </Link>
+        </div>
+      )}
 
       <div className="card-surface p-6 space-y-4">
         <h3 className="text-lg font-semibold">區塊一：輸入生成條件</h3>
@@ -253,8 +298,13 @@ export default function ArticlesPage() {
               placeholder="例如：我要寫給中小企業老闆看的品牌定位教學"
             />
           </label>
-          <button type="button" onClick={expandPrompt} className="brand-btn-secondary px-4 py-2">
-            生成精準提示詞
+          <button
+            type="button"
+            onClick={expandPrompt}
+            className="brand-btn-secondary px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!hasActiveAccess || loadingPrompt}
+          >
+            {loadingPrompt ? "生成中..." : "生成精準提示詞"}
           </button>
         </div>
 
@@ -288,8 +338,14 @@ export default function ArticlesPage() {
           />
         </label>
 
-        <button onClick={generate} className="brand-btn px-4 py-2">
-          生成文章
+        {status && <p className="rounded-xl border border-[var(--line)] bg-[#f8fbfb] px-4 py-3 text-sm text-slate-700">{status}</p>}
+
+        <button
+          onClick={generate}
+          className="brand-btn px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!hasActiveAccess || loadingArticle || loadingPrompt}
+        >
+          {loadingArticle ? "生成中..." : "生成文章"}
         </button>
       </div>
 
@@ -301,8 +357,12 @@ export default function ArticlesPage() {
           onChange={(e) => setContent(e.target.value)}
           placeholder="生成結果會顯示在此，可手動編輯"
         />
-        <button onClick={saveContent} className="brand-btn-secondary px-4 py-2">
-          儲存修改
+        <button
+          onClick={saveContent}
+          className="brand-btn-secondary px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!hasActiveAccess || savingContent}
+        >
+          {savingContent ? "儲存中..." : "儲存修改"}
         </button>
       </div>
 
@@ -356,8 +416,12 @@ export default function ArticlesPage() {
             />
           </label>
 
-          <button onClick={generateImages} className="brand-btn px-4 py-2">
-            生成相符配圖
+          <button
+            onClick={generateImages}
+            className="brand-btn px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!hasActiveAccess || loadingImages}
+          >
+            {loadingImages ? "生成中..." : "生成相符配圖"}
           </button>
         </div>
 
@@ -375,11 +439,19 @@ export default function ArticlesPage() {
         )}
 
         <div className="flex gap-3 flex-wrap">
-          <button onClick={() => publish("website")} className="brand-btn px-4 py-2">
-            發布至個人網頁
+          <button
+            onClick={() => publish("website")}
+            className="brand-btn px-4 py-2"
+            disabled={!hasActiveAccess || publishingChannel !== null}
+          >
+            {publishingChannel === "website" ? "發布中..." : "發布至個人網頁"}
           </button>
-          <button onClick={() => publish("social")} className="brand-btn-secondary px-4 py-2">
-            發布至社交平台
+          <button
+            onClick={() => publish("social")}
+            className="brand-btn-secondary px-4 py-2"
+            disabled={!hasActiveAccess || publishingChannel !== null}
+          >
+            {publishingChannel === "social" ? "發布中..." : "發布至社交平台"}
           </button>
         </div>
 

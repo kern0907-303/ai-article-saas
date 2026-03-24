@@ -1,5 +1,8 @@
 import { clearToken, getToken } from "@/lib/auth";
 import {
+  AdminRecentPayment,
+  AdminRecentUser,
+  AdminStats,
   Article,
   ArticleImage,
   AuthResponse,
@@ -14,8 +17,25 @@ import {
   Subscription,
 } from "@/lib/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 const REQUEST_TIMEOUT_MS = 20000;
+
+function resolveApiBase(): string {
+  const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (configuredBase) {
+    return configuredBase;
+  }
+
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location;
+    return `${protocol}//${hostname}:8001/api`;
+  }
+
+  return "http://127.0.0.1:8001/api";
+}
+
+async function parseErrorPayload(res: Response): Promise<Record<string, unknown>> {
+  return res.json().catch(() => ({}));
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const baseHeaders: HeadersInit = {
@@ -36,7 +56,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    const apiBase = resolveApiBase();
+    res = await fetch(`${apiBase}${path}`, {
       ...init,
       headers: baseHeaders,
       cache: "no-store",
@@ -46,20 +67,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if ((err as Error).name === "AbortError") {
       throw new Error("請求逾時，請檢查網路或稍後再試");
     }
-    throw err;
+    throw new Error("無法連線到後端 API，請確認前端與後端都已啟動，且後端位址設定正確");
   } finally {
     clearTimeout(timeout);
   }
 
   if (!res.ok) {
-    const payload = await res.json().catch(() => ({}));
+    const payload = await parseErrorPayload(res);
     if (res.status === 401) {
       clearToken();
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
         window.location.href = "/login";
       }
     }
-    throw new Error(payload.detail || "API 呼叫失敗");
+    const detail = typeof payload.detail === "string" ? payload.detail : "";
+    if (res.status === 402) {
+      throw new Error(detail || "目前尚未開通可用方案，請先到「訂閱與付款」啟用 7 天試用或完成付款");
+    }
+    if (res.status >= 500) {
+      throw new Error(detail || `伺服器暫時發生錯誤（HTTP ${res.status}）`);
+    }
+    throw new Error(detail || `API 呼叫失敗（HTTP ${res.status}）`);
   }
 
   return res.json();
@@ -148,4 +176,13 @@ export const api = {
 
   publishWebsite: (id: number) => request<{ message: string }>(`/publish/website/${id}`, { method: "POST" }),
   publishSocial: (id: number) => request<{ message: string }>(`/publish/social/${id}`, { method: "POST" }),
+
+  getAdminStats: (adminKey: string) =>
+    request<AdminStats>("/admin/stats", { headers: { "X-Admin-Key": adminKey } }),
+  listAdminRecentUsers: (adminKey: string, limit = 10) =>
+    request<AdminRecentUser[]>(`/admin/recent-users?limit=${limit}`, { headers: { "X-Admin-Key": adminKey } }),
+  listAdminRecentPayments: (adminKey: string, limit = 10) =>
+    request<AdminRecentPayment[]>(`/admin/recent-payments?limit=${limit}`, {
+      headers: { "X-Admin-Key": adminKey },
+    }),
 };

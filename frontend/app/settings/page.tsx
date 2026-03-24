@@ -29,10 +29,44 @@ const PROVIDER_DEFAULTS: Record<Settings["ai_provider"], { article: string; prom
   github: {
     article: "openai/gpt-4.1",
     prompt: "openai/gpt-4.1-mini",
-    keyHint: "使用 GitHub token，並確認具備 GitHub Models 所需權限。",
+    keyHint: "使用 GitHub token，並確認 fine-grained PAT 具備 models: read 權限。",
     keyPlaceholder: "ghp_... / github_pat_...",
   },
 };
+
+function getActiveProviderKey(form: {
+  ai_provider: Settings["ai_provider"];
+  openai_api_key: string;
+  anthropic_api_key: string;
+  gemini_api_key: string;
+  github_api_key: string;
+}): string {
+  if (form.ai_provider === "openai") return form.openai_api_key.trim();
+  if (form.ai_provider === "anthropic") return form.anthropic_api_key.trim();
+  if (form.ai_provider === "gemini") return form.gemini_api_key.trim();
+  return form.github_api_key.trim();
+}
+
+function validateProviderKey(provider: Settings["ai_provider"], apiKey: string): string | null {
+  if (!apiKey) {
+    return "請先填入目前所選供應商的 API Key。";
+  }
+
+  if (provider === "openai" && !apiKey.startsWith("sk-")) {
+    return "OpenAI API Key 格式看起來不正確，通常會以 sk- 開頭。";
+  }
+  if (provider === "anthropic" && !apiKey.startsWith("sk-ant-")) {
+    return "Anthropic API Key 格式看起來不正確，通常會以 sk-ant- 開頭。";
+  }
+  if (provider === "gemini" && !apiKey.startsWith("AIza")) {
+    return "Gemini API Key 格式看起來不正確，通常會以 AIza 開頭。";
+  }
+  if (provider === "github" && !(apiKey.startsWith("ghp_") || apiKey.startsWith("github_pat_"))) {
+    return "GitHub Models token 建議使用 ghp_ 或 github_pat_ 開頭的 GitHub token。";
+  }
+
+  return null;
+}
 
 export default function SettingsPage() {
   const [form, setForm] = useState({
@@ -104,6 +138,12 @@ export default function SettingsPage() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const activeProviderKey = getActiveProviderKey(form);
+    const keyError = validateProviderKey(form.ai_provider, activeProviderKey);
+    if (keyError) {
+      setStatus(keyError);
+      return;
+    }
     setStatus("儲存中...");
     try {
       await api.saveSettings(form);
@@ -162,7 +202,7 @@ export default function SettingsPage() {
           hint={form.ai_provider === "openai" ? providerConfig.keyHint : "選填。切換到 OpenAI 時會使用這組金鑰。"}
           linkText="👉 一步一步看 AI Key 申請與貼上方式"
           linkHref="/help/api-setup#ai-key"
-          placeholder="sk-..."
+          placeholder={form.ai_provider === "openai" ? providerConfig.keyPlaceholder : "sk-..."}
         />
 
         <Input
@@ -172,7 +212,7 @@ export default function SettingsPage() {
           hint={form.ai_provider === "anthropic" ? providerConfig.keyHint : "選填。切換到 Anthropic 時會使用這組金鑰。"}
           linkText="👉 前往 Anthropic Console 建立 API Key"
           linkHref="/help/api-setup#ai-key"
-          placeholder="sk-ant-..."
+          placeholder={form.ai_provider === "anthropic" ? providerConfig.keyPlaceholder : "sk-ant-..."}
         />
 
         <Input
@@ -182,7 +222,7 @@ export default function SettingsPage() {
           hint={form.ai_provider === "gemini" ? providerConfig.keyHint : "選填。切換到 Gemini 時會使用這組金鑰。"}
           linkText="👉 前往 Google AI Studio 建立 API Key"
           linkHref="/help/api-setup#ai-key"
-          placeholder="AIza..."
+          placeholder={form.ai_provider === "gemini" ? providerConfig.keyPlaceholder : "AIza..."}
         />
 
         <Input
@@ -192,7 +232,7 @@ export default function SettingsPage() {
           hint={form.ai_provider === "github" ? providerConfig.keyHint : "選填。切換到 GitHub Models 時會使用這組 token。"}
           linkText="👉 查看 GitHub Models token 與權限說明"
           linkHref="/help/api-setup#ai-key"
-          placeholder="ghp_... / github_pat_..."
+          placeholder={form.ai_provider === "github" ? providerConfig.keyPlaceholder : "ghp_... / github_pat_..."}
         />
 
         <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">
@@ -220,6 +260,25 @@ export default function SettingsPage() {
           </div>
           <p className="text-xs text-slate-600">成本層級：low（低）/ medium（中）/ high（高）</p>
           <p className="text-xs text-slate-500">若切換供應商，文章與提示詞模型會自動換成對應的預設值。</p>
+          {form.ai_provider === "github" && (
+            <div className="rounded-lg border border-dashed border-[#b9dedd] bg-white/70 p-3 space-y-3">
+              <p className="text-xs text-slate-600">
+                GitHub Models 可直接選常用模型，也可手動輸入 model ID。若 GitHub 更新模型清單，你可以直接覆蓋下面欄位。
+              </p>
+              <div className="grid md:grid-cols-2 gap-3">
+                <InputSimple
+                  label="GitHub 文章模型 ID"
+                  value={form.article_model}
+                  onChange={(v) => setForm({ ...form, article_model: v })}
+                />
+                <InputSimple
+                  label="GitHub 提示詞模型 ID"
+                  value={form.prompt_model}
+                  onChange={(v) => setForm({ ...form, prompt_model: v })}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">

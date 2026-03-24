@@ -484,7 +484,7 @@ export default function ArticlesPage() {
 
         <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">
           <p className="text-sm font-semibold text-[#0f766e]">AI 圖片生成（中文文字需求自動走 nano banana）</p>
-          <p className="text-xs text-slate-600">使用 OpenAI provider 時會產出真實圖片；若走 nano banana，目前仍會顯示預覽 mock 圖。</p>
+          <p className="text-xs text-slate-600">系統會自動選最合理路徑：可用時優先走 OpenAI 真實生圖，不可用時自動退回預覽 mock 圖。</p>
           <div className="grid md:grid-cols-2 gap-3">
             <label className="block text-sm font-medium">
               圖片風格

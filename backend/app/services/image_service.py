@@ -81,6 +81,16 @@ def resolve_model(provider: str, nano_banana_model: str, openai_image_model: str
     return openai_image_model
 
 
+def resolve_effective_provider(provider: str, openai_api_key: str | None) -> str:
+    if provider == "openai" and openai_api_key:
+        return "openai"
+    if provider == "openai" and not openai_api_key:
+        return "nano_banana"
+    if provider not in {"openai", "nano_banana"}:
+        return "nano_banana"
+    return provider
+
+
 def resolve_output_format(output_format: str) -> str:
     normalized = (output_format or "png").strip().lower()
     if normalized == "jpg":
@@ -315,7 +325,8 @@ def generate_image_plan(
         source_text=source_text,
         keywords_csv=setting.zh_text_detection_keywords,
     )
-    model = resolve_model(provider, setting.nano_banana_model, setting.openai_image_model)
+    effective_provider = resolve_effective_provider(provider, openai_api_key)
+    model = resolve_model(effective_provider, setting.nano_banana_model, setting.openai_image_model)
 
     prompt = build_image_prompt(
         article_topic=article_topic,
@@ -326,11 +337,9 @@ def generate_image_plan(
         text_content=text_content,
     )
 
-    if provider == "openai":
-        if not openai_api_key:
-            raise RuntimeError("尚未設定 OpenAI API Key，無法使用 OpenAI Images 真實生圖")
+    if effective_provider == "openai":
         image_urls = _generate_openai_images(
-            api_key=openai_api_key,
+            api_key=openai_api_key or "",
             model=model,
             prompt=prompt,
             size=getattr(setting, "default_size", "1536x1024"),
@@ -343,7 +352,7 @@ def generate_image_plan(
             build_placeholder_image_url(
                 width,
                 height,
-                provider,
+                effective_provider,
                 style_preset,
                 article_topic,
                 text_content,
@@ -355,7 +364,7 @@ def generate_image_plan(
     for index in range(num_images):
         plans.append(
             {
-                "provider": provider,
+                "provider": effective_provider,
                 "model": model,
                 "prompt": prompt,
                 "image_url": image_urls[index] if index < len(image_urls) else image_urls[-1],

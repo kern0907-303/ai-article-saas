@@ -145,16 +145,6 @@ export default function SettingsPage() {
       return;
     }
 
-    const expectsOpenAiImageKey =
-      imageSettings &&
-      form.ai_provider === "openai" &&
-      (imageSettings.image_provider_mode === "openai" ||
-        (imageSettings.image_provider_mode === "auto" && imageSettings.default_provider === "openai"));
-    if (expectsOpenAiImageKey && !form.openai_api_key.trim()) {
-      setStatus("圖片生成目前設定會使用 OpenAI，但你尚未填入 OpenAI API Key。");
-      return;
-    }
-
     setStatus("儲存中...");
     try {
       await api.saveSettings(form);
@@ -315,7 +305,7 @@ export default function SettingsPage() {
                   <option value="stability">stability</option>
                 </select>
                 <p className="mt-1 text-xs text-slate-500">
-                  若你本來就選 OpenAI 當文字供應商，圖片會直接共用同一組 OpenAI API Key，不需要再另外填第二組。
+                  系統會自動選最合理路徑：有 OpenAI Key 就走真實生圖，沒有時會自動退回預覽圖，不需要你手動理解 provider 差異。
                 </p>
               </label>
 

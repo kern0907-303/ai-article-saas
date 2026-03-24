@@ -22,4 +22,5 @@ class ArticleImage(BaseModel):
 
     text_language: Mapped[str | None] = mapped_column(String(20), nullable=True)
     text_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="generated")

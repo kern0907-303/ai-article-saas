@@ -48,6 +48,7 @@ class ArticleImageOut(BaseModel):
     height: int
     text_language: str | None
     text_content: str | None
+    generation_error: str | None
     status: str
     created_at: datetime
     updated_at: datetime

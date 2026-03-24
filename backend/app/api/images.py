@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.models.article import Article
 from app.models.article_image import ArticleImage
 from app.models.image_setting import ImageSetting
@@ -40,6 +40,80 @@ def _get_or_create_setting(db: Session, user_id: str) -> ImageSetting:
         if existing:
             return existing
         raise
+
+
+def _generate_images_in_background(
+    *,
+    image_ids: list[int],
+    article_id: int,
+    user_id: str,
+    style_preset: str,
+    custom_prompt: str | None,
+    need_text_overlay: bool,
+    text_language: str,
+    text_content: str | None,
+    num_images: int,
+) -> None:
+    db = SessionLocal()
+    try:
+        article = db.query(Article).filter(Article.id == article_id, Article.user_id == user_id).first()
+        if not article:
+            return
+
+        records = (
+            db.query(ArticleImage)
+            .filter(ArticleImage.user_id == user_id, ArticleImage.article_id == article_id, ArticleImage.id.in_(image_ids))
+            .all()
+        )
+        if not records:
+            return
+
+        for record in records:
+            record.status = "generating"
+            record.generation_error = None
+        db.commit()
+
+        setting = _get_or_create_setting(db, user_id)
+        plans = generate_image_plan(
+            article_topic=article.topic,
+            article_outline=article.outline,
+            style_preset=style_preset,
+            custom_prompt=custom_prompt,
+            need_text_overlay=need_text_overlay,
+            text_language=text_language,
+            text_content=text_content,
+            num_images=num_images,
+            setting=setting,
+        )
+
+        for record, plan in zip(records, plans, strict=False):
+            record.provider = plan["provider"]
+            record.model = plan["model"]
+            record.prompt = plan["prompt"]
+            record.image_url = plan["image_url"]
+            record.width = plan["width"]
+            record.height = plan["height"]
+            record.text_language = plan["text_language"]
+            record.text_content = plan["text_content"]
+            record.generation_error = None
+            record.status = "generated"
+
+        db.commit()
+        log_audit(db, action="images.generate", user_id=user_id, metadata={"article_id": article_id, "count": len(records)})
+        consume_feature_usage(db, int(user_id), feature="image_generate", amount=len(records))
+    except Exception as exc:
+        db.rollback()
+        failed_records = (
+            db.query(ArticleImage)
+            .filter(ArticleImage.user_id == user_id, ArticleImage.article_id == article_id, ArticleImage.id.in_(image_ids))
+            .all()
+        )
+        for record in failed_records:
+            record.status = "failed"
+            record.generation_error = str(exc)
+        db.commit()
+    finally:
+        db.close()
 
 
 @router.get("/image-style-presets", response_model=list[ImageStylePresetOut])
@@ -94,6 +168,7 @@ def list_article_images(
 def generate_article_images(
     article_id: int,
     payload: GenerateArticleImagesRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
     _: object = Depends(require_active_subscription),
@@ -108,33 +183,22 @@ def generate_article_images(
     num_images = payload.num_images or setting.images_per_article
     require_feature_access(db, int(user_id), feature="image_generate", amount=num_images)
 
-    plans = generate_image_plan(
-        article_topic=article.topic,
-        article_outline=article.outline,
-        style_preset=payload.style_preset,
-        custom_prompt=payload.custom_prompt,
-        need_text_overlay=payload.need_text_overlay,
-        text_language=payload.text_language,
-        text_content=payload.text_content,
-        num_images=num_images,
-        setting=setting,
-    )
-
     records: list[ArticleImage] = []
-    for plan in plans:
+    for _ in range(num_images):
         record = ArticleImage(
             user_id=user_id,
             article_id=article.id,
-            provider=plan["provider"],
-            model=plan["model"],
+            provider="pending",
+            model="pending",
             style_preset=payload.style_preset,
-            prompt=plan["prompt"],
-            image_url=plan["image_url"],
-            width=plan["width"],
-            height=plan["height"],
-            text_language=plan["text_language"],
-            text_content=plan["text_content"],
-            status="generated",
+            prompt=payload.custom_prompt or "",
+            image_url="",
+            width=1536,
+            height=1024,
+            text_language=payload.text_language,
+            text_content=payload.text_content,
+            generation_error=None,
+            status="queued",
         )
         db.add(record)
         records.append(record)
@@ -143,8 +207,18 @@ def generate_article_images(
     for record in records:
         db.refresh(record)
 
-    log_audit(db, action="images.generate", user_id=user_id, metadata={"article_id": article.id, "count": len(records)})
-    consume_feature_usage(db, int(user_id), feature="image_generate", amount=len(records))
+    background_tasks.add_task(
+        _generate_images_in_background,
+        image_ids=[record.id for record in records],
+        article_id=article.id,
+        user_id=user_id,
+        style_preset=payload.style_preset,
+        custom_prompt=payload.custom_prompt,
+        need_text_overlay=payload.need_text_overlay,
+        text_language=payload.text_language,
+        text_content=payload.text_content,
+        num_images=len(records),
+    )
     return records
 
 

@@ -39,6 +39,9 @@ def run_startup_migrations(engine: Engine) -> None:
     if _table_exists(engine, "articles"):
         _add_column_if_missing(engine, "articles", "generation_error TEXT", "generation_error")
 
+    if _table_exists(engine, "article_images"):
+        _add_column_if_missing(engine, "article_images", "generation_error TEXT", "generation_error")
+
     if _table_exists(engine, "knowledge_files"):
         _add_column_if_missing(
             engine,

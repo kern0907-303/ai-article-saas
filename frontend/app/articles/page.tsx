@@ -59,6 +59,7 @@ export default function ArticlesPage() {
   const [savingContent, setSavingContent] = useState(false);
   const [publishingChannel, setPublishingChannel] = useState<"website" | "social" | null>(null);
   const [pollingArticleId, setPollingArticleId] = useState<number | null>(null);
+  const [pollingImageArticleId, setPollingImageArticleId] = useState<number | null>(null);
 
   const currentArticle = useMemo(
     () => articles.find((item) => item.id === currentArticleId) || null,
@@ -90,6 +91,9 @@ export default function ArticlesPage() {
       setCurrentArticleId(newest.id);
       const imageList = await api.listArticleImages(newest.id);
       setImages(imageList);
+      if (imageList.some((image) => image.status === "queued" || image.status === "generating")) {
+        setPollingImageArticleId(newest.id);
+      }
       setContent(newest.content || "");
     } else if (!newest) {
       setImages([]);
@@ -139,9 +143,54 @@ export default function ArticlesPage() {
     return () => window.clearInterval(timer);
   }, [currentArticleId, pollingArticleId]);
 
+  useEffect(() => {
+    if (!pollingImageArticleId) return;
+
+    const timer = window.setInterval(async () => {
+      try {
+        const latestImages = await api.listArticleImages(pollingImageArticleId);
+        setImages(latestImages);
+
+        const hasQueued = latestImages.some((image) => image.status === "queued");
+        const hasGenerating = latestImages.some((image) => image.status === "generating");
+        const hasFailed = latestImages.some((image) => image.status === "failed");
+        const allGenerated = latestImages.length > 0 && latestImages.every((image) => image.status === "generated");
+
+        if (hasGenerating) {
+          setStatus("圖片生成中，請稍候...");
+          return;
+        }
+
+        if (hasQueued) {
+          setStatus("圖片已加入生成佇列，等待處理中...");
+          return;
+        }
+
+        if (allGenerated) {
+          setStatus("圖片生成完成");
+          setPollingImageArticleId(null);
+          return;
+        }
+
+        if (hasFailed) {
+          setStatus("部分圖片生成失敗，請檢查圖片卡片上的錯誤訊息");
+          setPollingImageArticleId(null);
+        }
+      } catch (err) {
+        setStatus(`圖片狀態更新失敗：${(err as Error).message}`);
+        setPollingImageArticleId(null);
+      }
+    }, 2500);
+
+    return () => window.clearInterval(timer);
+  }, [pollingImageArticleId]);
+
   const refreshImages = async (articleId: number) => {
     const imageList = await api.listArticleImages(articleId);
     setImages(imageList);
+    if (imageList.some((image) => image.status === "queued" || image.status === "generating")) {
+      setPollingImageArticleId(articleId);
+    }
   };
 
   const toggleFile = (id: number) => {
@@ -215,7 +264,7 @@ export default function ArticlesPage() {
       return;
     }
 
-    setStatus("生成配圖中...");
+    setStatus("圖片排隊中...");
     setLoadingImages(true);
     try {
       const result = await api.generateArticleImages(currentArticleId, {
@@ -226,12 +275,29 @@ export default function ArticlesPage() {
         text_content: imageTextContent || topic,
       });
       setImages(result);
-      setStatus("圖片生成成功（中文文字需求會自動走 nano banana）");
+      setStatus("已加入圖片生成佇列，等待處理中...");
+      setPollingImageArticleId(currentArticleId);
     } catch (err) {
       setStatus(`生成圖片失敗：${(err as Error).message}`);
     } finally {
       setLoadingImages(false);
     }
+  };
+
+  const imageStatusLabel = (imageStatus: string) => {
+    if (imageStatus === "queued") return "排隊中";
+    if (imageStatus === "generating") return "生成中";
+    if (imageStatus === "generated") return "已完成";
+    if (imageStatus === "failed") return "失敗";
+    return imageStatus;
+  };
+
+  const imageStatusClass = (imageStatus: string) => {
+    if (imageStatus === "queued") return "border-amber-200 bg-amber-50 text-amber-800";
+    if (imageStatus === "generating") return "border-sky-200 bg-sky-50 text-sky-800";
+    if (imageStatus === "generated") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    if (imageStatus === "failed") return "border-rose-200 bg-rose-50 text-rose-700";
+    return "border-slate-200 bg-slate-50 text-slate-700";
   };
 
   const saveContent = async () => {
@@ -476,10 +542,29 @@ export default function ArticlesPage() {
           <div className="grid md:grid-cols-2 gap-3">
             {images.map((image) => (
               <div key={image.id} className="rounded-xl border border-[var(--line)] bg-white p-3 space-y-2">
-                <img src={image.image_url} alt={`article-image-${image.id}`} className="w-full rounded-lg border border-slate-200" />
+                <div className="flex items-center justify-between gap-3">
+                  <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${imageStatusClass(image.status)}`}>
+                    {imageStatusLabel(image.status)}
+                  </span>
+                  <p className="text-xs text-slate-600">
+                    provider: {image.provider} / model: {image.model}
+                  </p>
+                </div>
+                {image.image_url ? (
+                  <img
+                    src={image.image_url}
+                    alt={`article-image-${image.id}`}
+                    className="w-full rounded-lg border border-slate-200"
+                  />
+                ) : (
+                  <div className="flex aspect-[3/2] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
+                    {image.status === "failed" ? "圖片生成失敗" : "圖片生成中，請稍候..."}
+                  </div>
+                )}
                 <p className="text-xs text-slate-600">
-                  provider: {image.provider} / model: {image.model}
+                  style: {image.style_preset}
                 </p>
+                {image.generation_error && <p className="text-xs text-rose-600">錯誤原因：{image.generation_error}</p>}
               </div>
             ))}
           </div>

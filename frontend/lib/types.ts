@@ -97,6 +97,7 @@ export type ArticleImage = {
   height: number;
   text_language?: string;
   text_content?: string;
+  generation_error?: string;
   status: string;
 };
 

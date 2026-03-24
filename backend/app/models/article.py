@@ -12,6 +12,7 @@ class Article(BaseModel):
     topic: Mapped[str] = mapped_column(String(255), index=True)
     outline: Mapped[str] = mapped_column(Text)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    generation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     selected_file_ids: Mapped[str | None] = mapped_column(String(255), nullable=True)
     generation_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     generation_status: Mapped[str] = mapped_column(String(50), default="draft")

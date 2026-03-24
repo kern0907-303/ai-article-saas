@@ -30,6 +30,7 @@ class ArticleOut(BaseModel):
     topic: str
     outline: str
     content: str | None
+    generation_error: str | None
     selected_file_ids: str | None
     generation_model: str | None
     generation_status: str

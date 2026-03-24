@@ -149,6 +149,7 @@ export const api = {
     }),
 
   listArticles: () => request<Article[]>("/articles"),
+  getArticle: (id: number) => request<Article>(`/articles/${id}`),
   expandPrompt: (payload: { requirement: string; model?: string }) =>
     request<{ prompt: string }>("/articles/prompt-expand", { method: "POST", body: JSON.stringify(payload) }),
   generateArticle: (payload: {

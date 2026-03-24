@@ -1,4 +1,5 @@
 import httpx
+import re
 
 from app.models.settings import Setting
 
@@ -27,7 +28,9 @@ def build_article_prompt(topic: str, outline: str, contexts: list[str], user_pro
 1. 全文使用繁體中文。
 2. 內容結構完整，需有標題、小節標題、結論。
 3. 避免捏造無根據數據，如引用請以中性描述處理。
-4. 請輸出 Markdown 格式。
+4. 請輸出純文字格式，不要使用 Markdown。
+5. 不要輸出 `#`、`##`、`###`、`**`、`__` 這類 Markdown 符號。
+6. 標題與小節請直接用一般文字換行呈現。
 """.strip()
 
 
@@ -263,7 +266,8 @@ def generate_article(
     provider = normalize_text_provider(user_setting.ai_provider)
     api_key = _require_provider_key(user_setting, provider)
     prompt = build_article_prompt(topic, outline, contexts, user_prompt)
-    return generate_text_with_provider(provider=provider, api_key=api_key, model=model, prompt=prompt)
+    generated = generate_text_with_provider(provider=provider, api_key=api_key, model=model, prompt=prompt)
+    return sanitize_generated_article(generated)
 
 
 def expand_prompt(
@@ -275,3 +279,10 @@ def expand_prompt(
     api_key = _require_provider_key(user_setting, provider)
     prompt = build_prompt_expansion_prompt(requirement)
     return generate_text_with_provider(provider=provider, api_key=api_key, model=model, prompt=prompt)
+
+
+def sanitize_generated_article(content: str) -> str:
+    sanitized = content.replace("**", "").replace("__", "")
+    sanitized = re.sub(r"(?m)^\s*#{1,6}\s*", "", sanitized)
+    sanitized = re.sub(r"\n{3,}", "\n\n", sanitized)
+    return sanitized.strip()

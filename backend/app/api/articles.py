@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.models.article import Article
 from app.models.knowledge_file import KnowledgeFile
 from app.models.settings import Setting
@@ -30,6 +31,73 @@ def _hydrate_provider_keys(setting: Setting) -> Setting:
     setting.gemini_api_key = decrypt_text(setting.gemini_api_key_encrypted) or setting.gemini_api_key
     setting.github_api_key = decrypt_text(setting.github_api_key_encrypted) or setting.github_api_key
     return setting
+
+
+def _generate_article_in_background(
+    *,
+    article_id: int,
+    user_id: str,
+    topic: str,
+    outline: str,
+    selected_file_ids: list[int],
+    prompt: str | None,
+    model: str,
+) -> None:
+    db = SessionLocal()
+    try:
+        article = db.query(Article).filter(Article.id == article_id, Article.user_id == user_id).first()
+        if not article:
+            return
+
+        article.generation_status = "generating"
+        article.generation_error = None
+        db.commit()
+
+        setting = db.query(Setting).filter(Setting.user_id == user_id).first()
+        if not setting:
+            article.generation_status = "failed"
+            article.generation_error = "找不到 AI 設定，請先回系統設定完成供應商與 API Key 設定"
+            db.commit()
+            return
+
+        contexts: list[str] = []
+        if selected_file_ids:
+            files = (
+                db.query(KnowledgeFile)
+                .filter(
+                    KnowledgeFile.user_id == user_id,
+                    KnowledgeFile.id.in_(selected_file_ids),
+                    KnowledgeFile.is_active.is_(True),
+                )
+                .all()
+            )
+            contexts = [extract_text_from_file(f.stored_path) for f in files]
+
+        content = generate_article_with_provider(
+            user_setting=_hydrate_provider_keys(setting),
+            topic=topic,
+            outline=outline,
+            contexts=contexts,
+            model=model,
+            user_prompt=prompt,
+        )
+
+        article.content = content
+        article.generation_status = "generated"
+        article.generation_error = None
+        db.commit()
+
+        log_audit(db, action="articles.generate", user_id=user_id, metadata={"article_id": article.id, "model": model})
+        consume_feature_usage(db, int(user_id), feature="article_generate", amount=1)
+    except Exception as exc:
+        db.rollback()
+        article = db.query(Article).filter(Article.id == article_id, Article.user_id == user_id).first()
+        if article:
+            article.generation_status = "failed"
+            article.generation_error = str(exc)
+            db.commit()
+    finally:
+        db.close()
 
 
 @router.get("", response_model=list[ArticleOut])
@@ -79,6 +147,7 @@ def expand_prompt(
 @router.post("/generate", response_model=ArticleOut)
 def generate_article(
     payload: ArticleGenerateRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
@@ -86,53 +155,35 @@ def generate_article(
     if not setting:
         raise HTTPException(status_code=400, detail="請先在系統設定完成 AI 供應商與 API Key 設定")
 
-    contexts: list[str] = []
-    if payload.selected_file_ids:
-        files = (
-            db.query(KnowledgeFile)
-            .filter(
-                KnowledgeFile.user_id == user_id,
-                KnowledgeFile.id.in_(payload.selected_file_ids),
-                KnowledgeFile.is_active.is_(True),
-            )
-            .all()
-        )
-        contexts = [extract_text_from_file(f.stored_path) for f in files]
-
     check_rate_limit(f"article-generate:{user_id}", limit=10, window_seconds=60)
     require_feature_access(db, int(user_id), feature="article_generate", amount=1)
 
     model = payload.model or setting.article_model or "gpt-4.1-mini"
 
-    try:
-        content = generate_article_with_provider(
-            user_setting=_hydrate_provider_keys(setting),
-            topic=payload.topic,
-            outline=payload.outline,
-            contexts=contexts,
-            model=model,
-            user_prompt=payload.prompt,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"生成失敗：{exc}") from exc
-
     article = Article(
         user_id=user_id,
         topic=payload.topic,
         outline=payload.outline,
-        content=content,
+        content=None,
+        generation_error=None,
         selected_file_ids=",".join(str(fid) for fid in payload.selected_file_ids) if payload.selected_file_ids else None,
         generation_model=model,
-        generation_status="generated",
+        generation_status="queued",
     )
     db.add(article)
     db.commit()
     db.refresh(article)
 
-    log_audit(db, action="articles.generate", user_id=user_id, metadata={"article_id": article.id, "model": model})
-    consume_feature_usage(db, int(user_id), feature="article_generate", amount=1)
+    background_tasks.add_task(
+        _generate_article_in_background,
+        article_id=article.id,
+        user_id=user_id,
+        topic=payload.topic,
+        outline=payload.outline,
+        selected_file_ids=payload.selected_file_ids,
+        prompt=payload.prompt,
+        model=model,
+    )
     return article
 
 

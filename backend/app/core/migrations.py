@@ -36,6 +36,9 @@ def run_startup_migrations(engine: Engine) -> None:
         _add_column_if_missing(engine, "settings", "prompt_model VARCHAR(100) DEFAULT 'gpt-4.1-mini'", "prompt_model")
         _add_column_if_missing(engine, "settings", "image_model VARCHAR(100) DEFAULT 'gpt-image-1'", "image_model")
 
+    if _table_exists(engine, "articles"):
+        _add_column_if_missing(engine, "articles", "generation_error TEXT", "generation_error")
+
     if _table_exists(engine, "knowledge_files"):
         _add_column_if_missing(
             engine,

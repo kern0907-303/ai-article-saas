@@ -58,6 +58,7 @@ export default function ArticlesPage() {
   const [loadingImages, setLoadingImages] = useState(false);
   const [savingContent, setSavingContent] = useState(false);
   const [publishingChannel, setPublishingChannel] = useState<"website" | "social" | null>(null);
+  const [pollingArticleId, setPollingArticleId] = useState<number | null>(null);
 
   const currentArticle = useMemo(
     () => articles.find((item) => item.id === currentArticleId) || null,
@@ -98,6 +99,45 @@ export default function ArticlesPage() {
   useEffect(() => {
     load().catch((err: Error) => setStatus(`初始化失敗：${err.message}`));
   }, []);
+
+  useEffect(() => {
+    if (!pollingArticleId) return;
+
+    const timer = window.setInterval(async () => {
+      try {
+        const latest = await api.getArticle(pollingArticleId);
+        setArticles((prev) => {
+          const exists = prev.some((item) => item.id === latest.id);
+          if (!exists) {
+            return [latest, ...prev];
+          }
+          return prev.map((item) => (item.id === latest.id ? latest : item));
+        });
+
+        if (latest.id === currentArticleId) {
+          setContent(latest.content || "");
+        }
+
+        if (latest.generation_status === "generated") {
+          setStatus("文章生成完成");
+          setPollingArticleId(null);
+          await refreshImages(latest.id);
+        } else if (latest.generation_status === "failed") {
+          setStatus(`生成失敗：${latest.generation_error || "背景任務失敗，請稍後再試"}`);
+          setPollingArticleId(null);
+        } else if (latest.generation_status === "generating") {
+          setStatus("文章生成中，請稍候...");
+        } else if (latest.generation_status === "queued") {
+          setStatus("已加入生成佇列，等待處理中...");
+        }
+      } catch (err) {
+        setStatus(`狀態更新失敗：${(err as Error).message}`);
+        setPollingArticleId(null);
+      }
+    }, 2500);
+
+    return () => window.clearInterval(timer);
+  }, [currentArticleId, pollingArticleId]);
 
   const refreshImages = async (articleId: number) => {
     const imageList = await api.listArticleImages(articleId);
@@ -152,9 +192,16 @@ export default function ArticlesPage() {
       });
       setContent(article.content || "");
       setCurrentArticleId(article.id);
-      setStatus("生成成功");
+      setArticles((prev) => {
+        const exists = prev.some((item) => item.id === article.id);
+        if (!exists) {
+          return [article, ...prev];
+        }
+        return prev.map((item) => (item.id === article.id ? article : item));
+      });
+      setStatus("已加入生成佇列，等待處理中...");
+      setPollingArticleId(article.id);
       await load();
-      await refreshImages(article.id);
     } catch (err) {
       setStatus(`生成失敗：${(err as Error).message}`);
     } finally {
@@ -457,9 +504,13 @@ export default function ArticlesPage() {
 
         {currentArticle && (
           <p className="text-sm text-slate-600">
-            目前文章狀態：網頁 {currentArticle.published_to_website ? "已發布" : "未發布"} / 社交平台{" "}
+            目前文章狀態：生成 {currentArticle.generation_status} / 網頁 {currentArticle.published_to_website ? "已發布" : "未發布"} / 社交平台{" "}
             {currentArticle.published_to_social ? "已發布" : "未發布"}
           </p>
+        )}
+
+        {currentArticle?.generation_error && (
+          <p className="text-sm text-red-600">錯誤原因：{currentArticle.generation_error}</p>
         )}
 
         {status && <p className="text-sm text-slate-700">{status}</p>}

@@ -42,6 +42,7 @@ export type Article = {
   topic: string;
   outline: string;
   content?: string;
+  generation_error?: string;
   selected_file_ids?: string;
   generation_model?: string;
   generation_status: string;

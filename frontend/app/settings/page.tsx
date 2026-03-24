@@ -5,11 +5,35 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
-import { ImageSettings, ModelCatalogItem } from "@/lib/types";
+import { ImageSettings, ModelCatalogItem, Settings } from "@/lib/types";
+
+const PROVIDER_DEFAULTS: Record<Settings["ai_provider"], { article: string; prompt: string; keyHint: string; keyPlaceholder: string }> = {
+  openai: {
+    article: "gpt-4.1-mini",
+    prompt: "gpt-4.1-mini",
+    keyHint: "使用 OpenAI 平台發出的 API Key，通常以 sk- 開頭。",
+    keyPlaceholder: "sk-...",
+  },
+  anthropic: {
+    article: "claude-3-5-sonnet-latest",
+    prompt: "claude-3-5-haiku-latest",
+    keyHint: "使用 Anthropic Console 發出的 API Key。",
+    keyPlaceholder: "sk-ant-...",
+  },
+  gemini: {
+    article: "gemini-1.5-pro",
+    prompt: "gemini-1.5-flash",
+    keyHint: "使用 Google AI Studio 或 Gemini API 發出的 API Key。",
+    keyPlaceholder: "AIza...",
+  },
+};
 
 export default function SettingsPage() {
   const [form, setForm] = useState({
+    ai_provider: "openai" as Settings["ai_provider"],
     openai_api_key: "",
+    anthropic_api_key: "",
+    gemini_api_key: "",
     website_api_key: "",
     social_api_key: "",
     article_model: "gpt-4.1-mini",
@@ -28,7 +52,10 @@ export default function SettingsPage() {
       .then(([settingsData, imageData, modelData]) => {
         if (settingsData) {
           setForm({
+            ai_provider: settingsData.ai_provider || "openai",
             openai_api_key: settingsData.openai_api_key || "",
+            anthropic_api_key: settingsData.anthropic_api_key || "",
+            gemini_api_key: settingsData.gemini_api_key || "",
             website_api_key: settingsData.website_api_key || "",
             social_api_key: settingsData.social_api_key || "",
             article_model: settingsData.article_model || "gpt-4.1-mini",
@@ -45,8 +72,27 @@ export default function SettingsPage() {
       .catch((err: Error) => setStatus(`讀取失敗：${err.message}`));
   }, []);
 
-  const textModels = useMemo(() => modelCatalog.filter((m) => m.category === "text"), [modelCatalog]);
+  const textModels = useMemo(
+    () => modelCatalog.filter((m) => m.category === "text" && m.provider === form.ai_provider),
+    [form.ai_provider, modelCatalog],
+  );
   const imageModels = useMemo(() => modelCatalog.filter((m) => m.category === "image"), [modelCatalog]);
+  const providerConfig = PROVIDER_DEFAULTS[form.ai_provider];
+
+  useEffect(() => {
+    if (textModels.length === 0) return;
+
+    setForm((prev) => {
+      const next = { ...prev };
+      if (!textModels.some((model) => model.key === prev.article_model)) {
+        next.article_model = PROVIDER_DEFAULTS[prev.ai_provider].article;
+      }
+      if (!textModels.some((model) => model.key === prev.prompt_model)) {
+        next.prompt_model = PROVIDER_DEFAULTS[prev.ai_provider].prompt;
+      }
+      return next;
+    });
+  }, [textModels]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -79,18 +125,60 @@ export default function SettingsPage() {
       </div>
 
       <form onSubmit={onSubmit} className="card-surface p-6 space-y-4">
+        <label className="block text-sm font-medium text-slate-700">
+          文字模型供應商
+          <select
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+            value={form.ai_provider}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                ai_provider: e.target.value as Settings["ai_provider"],
+                article_model: PROVIDER_DEFAULTS[e.target.value as Settings["ai_provider"]].article,
+                prompt_model: PROVIDER_DEFAULTS[e.target.value as Settings["ai_provider"]].prompt,
+              }))
+            }
+          >
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="gemini">Gemini</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-500">文章生成與提示詞擴寫會依這裡選的供應商切換。</p>
+        </label>
+
         <Input
-          label="AI 服務 API Key (如 OpenAI / Anthropic)"
+          label="OpenAI API Key"
           value={form.openai_api_key}
           onChange={(v) => setForm({ ...form, openai_api_key: v })}
-          hint="必填。未填此欄會無法生成文章與提示詞。"
+          hint={form.ai_provider === "openai" ? providerConfig.keyHint : "選填。切換到 OpenAI 時會使用這組金鑰。"}
           linkText="👉 一步一步看 AI Key 申請與貼上方式"
           linkHref="/help/api-setup#ai-key"
           placeholder="sk-..."
         />
 
+        <Input
+          label="Anthropic API Key"
+          value={form.anthropic_api_key}
+          onChange={(v) => setForm({ ...form, anthropic_api_key: v })}
+          hint={form.ai_provider === "anthropic" ? providerConfig.keyHint : "選填。切換到 Anthropic 時會使用這組金鑰。"}
+          linkText="👉 前往 Anthropic Console 建立 API Key"
+          linkHref="/help/api-setup#ai-key"
+          placeholder="sk-ant-..."
+        />
+
+        <Input
+          label="Gemini API Key"
+          value={form.gemini_api_key}
+          onChange={(v) => setForm({ ...form, gemini_api_key: v })}
+          hint={form.ai_provider === "gemini" ? providerConfig.keyHint : "選填。切換到 Gemini 時會使用這組金鑰。"}
+          linkText="👉 前往 Google AI Studio 建立 API Key"
+          linkHref="/help/api-setup#ai-key"
+          placeholder="AIza..."
+        />
+
         <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">
-          <h3 className="font-semibold text-[#0f766e]">AI 模型選擇（含成本層級）</h3>
+          <h3 className="font-semibold text-[#0f766e]">AI 模型選擇（依供應商切換）</h3>
+          <p className="text-xs text-slate-600">目前供應商：{form.ai_provider}</p>
           <div className="grid md:grid-cols-3 gap-3">
             <Select
               label="文章生成模型"
@@ -112,6 +200,7 @@ export default function SettingsPage() {
             />
           </div>
           <p className="text-xs text-slate-600">成本層級：low（低）/ medium（中）/ high（高）</p>
+          <p className="text-xs text-slate-500">若切換供應商，文章與提示詞模型會自動換成對應的預設值。</p>
         </div>
 
         <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">

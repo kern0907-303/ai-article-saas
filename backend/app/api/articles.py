@@ -12,7 +12,8 @@ from app.schemas.article import (
     PromptExpandRequest,
     PromptExpandResponse,
 )
-from app.services.ai_service import expand_prompt_with_openai, generate_article_with_openai
+from app.services.ai_service import expand_prompt as expand_prompt_with_provider
+from app.services.ai_service import generate_article as generate_article_with_provider
 from app.services.audit_service import log_audit
 from app.services.entitlement_service import consume_feature_usage, require_feature_access
 from app.services.file_service import extract_text_from_file
@@ -23,8 +24,11 @@ from app.utils.deps import get_current_user_id, require_active_subscription
 router = APIRouter(prefix="/articles", tags=["articles"], dependencies=[Depends(require_active_subscription)])
 
 
-def _resolved_openai_key(setting: Setting) -> str | None:
-    return decrypt_text(setting.openai_api_key_encrypted) or setting.openai_api_key
+def _hydrate_provider_keys(setting: Setting) -> Setting:
+    setting.openai_api_key = decrypt_text(setting.openai_api_key_encrypted) or setting.openai_api_key
+    setting.anthropic_api_key = decrypt_text(setting.anthropic_api_key_encrypted) or setting.anthropic_api_key
+    setting.gemini_api_key = decrypt_text(setting.gemini_api_key_encrypted) or setting.gemini_api_key
+    return setting
 
 
 @router.get("", response_model=list[ArticleOut])
@@ -48,19 +52,16 @@ def expand_prompt(
 ):
     setting = db.query(Setting).filter(Setting.user_id == user_id).first()
     if not setting:
-        raise HTTPException(status_code=400, detail="請先在系統設定填寫 OpenAI API Key")
+        raise HTTPException(status_code=400, detail="請先在系統設定完成 AI 供應商與 API Key 設定")
 
     check_rate_limit(f"prompt-expand:{user_id}", limit=20, window_seconds=60)
     require_feature_access(db, int(user_id), feature="prompt_expand", amount=1)
 
-    tmp_setting = setting
-    tmp_setting.openai_api_key = _resolved_openai_key(setting)
-
     model = payload.model or setting.prompt_model or "gpt-4.1-mini"
 
     try:
-        prompt = expand_prompt_with_openai(
-            user_setting=tmp_setting,
+        prompt = expand_prompt_with_provider(
+            user_setting=_hydrate_provider_keys(setting),
             requirement=payload.requirement,
             model=model,
         )
@@ -82,7 +83,7 @@ def generate_article(
 ):
     setting = db.query(Setting).filter(Setting.user_id == user_id).first()
     if not setting:
-        raise HTTPException(status_code=400, detail="請先在系統設定填寫 OpenAI API Key")
+        raise HTTPException(status_code=400, detail="請先在系統設定完成 AI 供應商與 API Key 設定")
 
     contexts: list[str] = []
     if payload.selected_file_ids:
@@ -100,13 +101,11 @@ def generate_article(
     check_rate_limit(f"article-generate:{user_id}", limit=10, window_seconds=60)
     require_feature_access(db, int(user_id), feature="article_generate", amount=1)
 
-    tmp_setting = setting
-    tmp_setting.openai_api_key = _resolved_openai_key(setting)
     model = payload.model or setting.article_model or "gpt-4.1-mini"
 
     try:
-        content = generate_article_with_openai(
-            user_setting=tmp_setting,
+        content = generate_article_with_provider(
+            user_setting=_hydrate_provider_keys(setting),
             topic=payload.topic,
             outline=payload.outline,
             contexts=contexts,

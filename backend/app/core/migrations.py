@@ -22,7 +22,12 @@ def run_startup_migrations(engine: Engine) -> None:
         _add_column_if_missing(engine, "users", "token_version INTEGER DEFAULT 1", "token_version")
 
     if _table_exists(engine, "settings"):
+        _add_column_if_missing(engine, "settings", "ai_provider VARCHAR(50) DEFAULT 'openai'", "ai_provider")
         _add_column_if_missing(engine, "settings", "openai_api_key_encrypted TEXT", "openai_api_key_encrypted")
+        _add_column_if_missing(engine, "settings", "anthropic_api_key VARCHAR(255)", "anthropic_api_key")
+        _add_column_if_missing(engine, "settings", "gemini_api_key VARCHAR(255)", "gemini_api_key")
+        _add_column_if_missing(engine, "settings", "anthropic_api_key_encrypted TEXT", "anthropic_api_key_encrypted")
+        _add_column_if_missing(engine, "settings", "gemini_api_key_encrypted TEXT", "gemini_api_key_encrypted")
         _add_column_if_missing(engine, "settings", "website_api_key_encrypted TEXT", "website_api_key_encrypted")
         _add_column_if_missing(engine, "settings", "social_api_key_encrypted TEXT", "social_api_key_encrypted")
         _add_column_if_missing(engine, "settings", "article_model VARCHAR(100) DEFAULT 'gpt-4.1-mini'", "article_model")

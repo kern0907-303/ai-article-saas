@@ -28,6 +28,38 @@ MODEL_CATALOG: list[ModelCatalogItem] = [
         cost_tier="high",
     ),
     ModelCatalogItem(
+        key="claude-3-5-haiku-latest",
+        provider="anthropic",
+        category="text",
+        label="Claude 3.5 Haiku",
+        description="回應快，適合提示詞擴寫與一般文章草稿",
+        cost_tier="low",
+    ),
+    ModelCatalogItem(
+        key="claude-3-5-sonnet-latest",
+        provider="anthropic",
+        category="text",
+        label="Claude 3.5 Sonnet",
+        description="平衡品質與速度，適合較完整長文寫作",
+        cost_tier="medium",
+    ),
+    ModelCatalogItem(
+        key="gemini-1.5-flash",
+        provider="gemini",
+        category="text",
+        label="Gemini 1.5 Flash",
+        description="速度快，適合大量生成與快速試稿",
+        cost_tier="low",
+    ),
+    ModelCatalogItem(
+        key="gemini-1.5-pro",
+        provider="gemini",
+        category="text",
+        label="Gemini 1.5 Pro",
+        description="較適合長文、推理與較高品質內容生成",
+        cost_tier="high",
+    ),
+    ModelCatalogItem(
         key="gpt-image-1",
         provider="openai",
         category="image",
@@ -50,7 +82,10 @@ def _out_from_setting(record: Setting) -> SettingsOut:
     return SettingsOut(
         id=record.id,
         user_id=record.user_id,
+        ai_provider=record.ai_provider or "openai",
         openai_api_key=decrypt_text(record.openai_api_key_encrypted) or record.openai_api_key,
+        anthropic_api_key=decrypt_text(record.anthropic_api_key_encrypted) or record.anthropic_api_key,
+        gemini_api_key=decrypt_text(record.gemini_api_key_encrypted) or record.gemini_api_key,
         website_api_key=decrypt_text(record.website_api_key_encrypted) or record.website_api_key,
         social_api_key=decrypt_text(record.social_api_key_encrypted) or record.social_api_key,
         article_model=record.article_model,
@@ -88,12 +123,17 @@ def upsert_settings(
 
     data = payload.model_dump()
 
+    record.ai_provider = data.get("ai_provider") or record.ai_provider or "openai"
     record.openai_api_key_encrypted = encrypt_text(data.get("openai_api_key"))
+    record.anthropic_api_key_encrypted = encrypt_text(data.get("anthropic_api_key"))
+    record.gemini_api_key_encrypted = encrypt_text(data.get("gemini_api_key"))
     record.website_api_key_encrypted = encrypt_text(data.get("website_api_key"))
     record.social_api_key_encrypted = encrypt_text(data.get("social_api_key"))
 
     # 去除明文殘留
     record.openai_api_key = None
+    record.anthropic_api_key = None
+    record.gemini_api_key = None
     record.website_api_key = None
     record.social_api_key = None
 
@@ -107,7 +147,17 @@ def upsert_settings(
     db.commit()
     db.refresh(record)
 
-    log_audit(db, action="settings.update", user_id=user_id, metadata={"article_model": record.article_model, "prompt_model": record.prompt_model, "image_model": record.image_model})
+    log_audit(
+        db,
+        action="settings.update",
+        user_id=user_id,
+        metadata={
+            "ai_provider": record.ai_provider,
+            "article_model": record.article_model,
+            "prompt_model": record.prompt_model,
+            "image_model": record.image_model,
+        },
+    )
     return _out_from_setting(record)
 
 

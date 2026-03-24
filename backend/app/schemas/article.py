@@ -7,13 +7,13 @@ class ArticleGenerateRequest(BaseModel):
     topic: str = Field(min_length=1, max_length=255)
     outline: str = Field(min_length=1)
     selected_file_ids: list[int] = []
-    model: str = "gpt-4.1-mini"
+    model: str | None = None
     prompt: str | None = None
 
 
 class PromptExpandRequest(BaseModel):
     requirement: str = Field(min_length=1, max_length=500)
-    model: str = "gpt-4.1-mini"
+    model: str | None = None
 
 
 class PromptExpandResponse(BaseModel):

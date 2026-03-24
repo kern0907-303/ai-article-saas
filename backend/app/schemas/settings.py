@@ -4,7 +4,10 @@ from pydantic import BaseModel
 
 
 class SettingsBase(BaseModel):
+    ai_provider: str = "openai"
     openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
+    gemini_api_key: str | None = None
     website_api_key: str | None = None
     social_api_key: str | None = None
 

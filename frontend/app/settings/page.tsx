@@ -144,11 +144,25 @@ export default function SettingsPage() {
       setStatus(keyError);
       return;
     }
+
+    const expectsOpenAiImageKey =
+      imageSettings &&
+      (imageSettings.image_provider_mode === "openai" ||
+        (imageSettings.image_provider_mode === "auto" && imageSettings.default_provider === "openai"));
+    if (expectsOpenAiImageKey && !form.openai_api_key.trim()) {
+      setStatus("圖片生成目前設定會使用 OpenAI，但你尚未填入 OpenAI API Key。");
+      return;
+    }
+
     setStatus("儲存中...");
     try {
       await api.saveSettings(form);
       if (imageSettings) {
-        await api.saveImageSettings(imageSettings);
+        await api.saveImageSettings({
+          ...imageSettings,
+          openai_image_model: form.image_model.startsWith("gpt-image") ? form.image_model : imageSettings.openai_image_model,
+          nano_banana_model: form.image_model.startsWith("nano-banana") ? form.image_model : imageSettings.nano_banana_model,
+        });
       }
       setStatus("儲存成功，現在可前往「文章創作與發布」測試。 ");
     } catch (err) {

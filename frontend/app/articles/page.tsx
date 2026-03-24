@@ -484,7 +484,7 @@ export default function ArticlesPage() {
 
         <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">
           <p className="text-sm font-semibold text-[#0f766e]">AI 圖片生成（中文文字需求自動走 nano banana）</p>
-          <p className="text-xs text-slate-600">目前這裡顯示的是系統預覽圖，會先讓你確認版型與文字位置，不是最終真實 AI 出圖。</p>
+          <p className="text-xs text-slate-600">使用 OpenAI provider 時會產出真實圖片；若走 nano banana，目前仍會顯示預覽 mock 圖。</p>
           <div className="grid md:grid-cols-2 gap-3">
             <label className="block text-sm font-medium">
               圖片風格
@@ -565,7 +565,9 @@ export default function ArticlesPage() {
                 <p className="text-xs text-slate-600">
                   style: {image.style_preset}
                 </p>
-                <p className="text-xs text-slate-500">這張是預覽 mock 圖，用來確認構圖與文案位置。</p>
+                {image.provider === "nano_banana" && (
+                  <p className="text-xs text-slate-500">這張是預覽 mock 圖，用來確認構圖與文案位置。</p>
+                )}
                 {image.generation_error && <p className="text-xs text-rose-600">錯誤原因：{image.generation_error}</p>}
               </div>
             ))}

@@ -3,6 +3,9 @@ from typing import Any
 from urllib.parse import quote
 from uuid import uuid4
 
+import httpx
+from openai import OpenAI
+
 STYLE_PRESETS: dict[str, dict[str, str]] = {
     "blog_cover": {
         "label": "部落客封面圖",
@@ -25,6 +28,8 @@ STYLE_PRESETS: dict[str, dict[str, str]] = {
         "prompt_suffix": "educational diagram style, clear sections, concept visualization",
     },
 }
+
+OPENAI_IMAGE_TIMEOUT = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=60.0)
 
 
 def parse_size(size: str) -> tuple[int, int]:
@@ -76,6 +81,24 @@ def resolve_model(provider: str, nano_banana_model: str, openai_image_model: str
     return openai_image_model
 
 
+def resolve_output_format(output_format: str) -> str:
+    normalized = (output_format or "png").strip().lower()
+    if normalized == "jpg":
+        return "jpeg"
+    if normalized not in {"png", "jpeg", "webp"}:
+        return "png"
+    return normalized
+
+
+def resolve_quality(quality: str) -> str:
+    normalized = (quality or "high").strip().lower()
+    if normalized == "standard":
+        return "high"
+    if normalized not in {"low", "medium", "high", "auto"}:
+        return "high"
+    return normalized
+
+
 def build_image_prompt(
     article_topic: str,
     article_outline: str,
@@ -98,7 +121,7 @@ def build_image_prompt(
         f"Style detail: {preset['prompt_suffix']}\n"
         f"Extra instruction: {(custom_prompt or '').strip() or 'none'}\n"
         f"Text overlay: {text_instruction}\n"
-        "Output should be commercial-quality cover image."
+        "Create a polished, commercial-quality cover image with strong focal point and readable composition."
     )
 
 
@@ -192,6 +215,46 @@ def build_placeholder_image_url(
     return f"data:image/svg+xml;charset=UTF-8,{quote(svg)}"
 
 
+def _data_url_from_base64(output_format: str, image_base64: str) -> str:
+    mime = "image/jpeg" if output_format == "jpeg" else f"image/{output_format}"
+    return f"data:{mime};base64,{image_base64}"
+
+
+def _generate_openai_images(
+    *,
+    api_key: str,
+    model: str,
+    prompt: str,
+    size: str,
+    quality: str,
+    output_format: str,
+    num_images: int,
+) -> list[str]:
+    client = OpenAI(api_key=api_key, timeout=OPENAI_IMAGE_TIMEOUT)
+    response = client.images.generate(
+        model=model,
+        prompt=prompt,
+        n=num_images,
+        size=size,
+        quality=quality,
+        output_format=output_format,
+        response_format="b64_json",
+    )
+    data = response.data or []
+    if not data:
+        raise RuntimeError("OpenAI Images 未回傳圖片資料")
+
+    image_urls: list[str] = []
+    for item in data:
+        if item.b64_json:
+            image_urls.append(_data_url_from_base64(output_format, item.b64_json))
+
+    if not image_urls:
+        raise RuntimeError("OpenAI Images 未回傳可用圖片內容")
+
+    return image_urls
+
+
 def list_style_presets() -> list[dict[str, str]]:
     return [
         {
@@ -230,8 +293,11 @@ def generate_image_plan(
     text_content: str | None,
     num_images: int,
     setting: Any,
+    openai_api_key: str | None = None,
 ) -> list[dict[str, Any]]:
     width, height = parse_size(setting.default_size)
+    output_format = resolve_output_format(getattr(setting, "output_format", "png"))
+    quality = resolve_quality(getattr(setting, "default_quality", "high"))
     source_text = build_source_text_for_provider_decision(
         article_topic,
         article_outline,
@@ -260,21 +326,39 @@ def generate_image_plan(
         text_content=text_content,
     )
 
+    if provider == "openai":
+        if not openai_api_key:
+            raise RuntimeError("尚未設定 OpenAI API Key，無法使用 OpenAI Images 真實生圖")
+        image_urls = _generate_openai_images(
+            api_key=openai_api_key,
+            model=model,
+            prompt=prompt,
+            size=getattr(setting, "default_size", "1536x1024"),
+            quality=quality,
+            output_format=output_format,
+            num_images=num_images,
+        )
+    else:
+        image_urls = [
+            build_placeholder_image_url(
+                width,
+                height,
+                provider,
+                style_preset,
+                article_topic,
+                text_content,
+            )
+            for _ in range(num_images)
+        ]
+
     plans: list[dict[str, Any]] = []
-    for _ in range(num_images):
+    for index in range(num_images):
         plans.append(
             {
                 "provider": provider,
                 "model": model,
                 "prompt": prompt,
-                "image_url": build_placeholder_image_url(
-                    width,
-                    height,
-                    provider,
-                    style_preset,
-                    article_topic,
-                    text_content,
-                ),
+                "image_url": image_urls[index] if index < len(image_urls) else image_urls[-1],
                 "width": width,
                 "height": height,
                 "text_language": text_language,

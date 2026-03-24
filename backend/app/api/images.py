@@ -6,6 +6,7 @@ from app.core.database import SessionLocal, get_db
 from app.models.article import Article
 from app.models.article_image import ArticleImage
 from app.models.image_setting import ImageSetting
+from app.models.settings import Setting
 from app.schemas.image import (
     ArticleImageOut,
     GenerateArticleImagesRequest,
@@ -15,6 +16,7 @@ from app.schemas.image import (
     RegenerateArticleImageRequest,
 )
 from app.services.audit_service import log_audit
+from app.services.crypto_service import decrypt_text
 from app.services.entitlement_service import consume_feature_usage, require_feature_access
 from app.services.image_service import generate_image_plan, list_style_presets
 from app.services.rate_limit_service import check_rate_limit
@@ -40,6 +42,13 @@ def _get_or_create_setting(db: Session, user_id: str) -> ImageSetting:
         if existing:
             return existing
         raise
+
+
+def _get_openai_image_api_key(db: Session, user_id: str) -> str | None:
+    setting = db.query(Setting).filter(Setting.user_id == user_id).first()
+    if not setting:
+        return None
+    return decrypt_text(setting.openai_api_key_encrypted) or setting.openai_api_key
 
 
 def _generate_images_in_background(
@@ -84,6 +93,7 @@ def _generate_images_in_background(
             text_content=text_content,
             num_images=num_images,
             setting=setting,
+            openai_api_key=_get_openai_image_api_key(db, user_id),
         )
 
         for record, plan in zip(records, plans, strict=False):
@@ -252,6 +262,7 @@ def regenerate_article_image(
         text_content=payload.text_content,
         num_images=1,
         setting=setting,
+        openai_api_key=_get_openai_image_api_key(db, user_id),
     )
     plan = plans[0]
 

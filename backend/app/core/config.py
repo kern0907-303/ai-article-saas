@@ -10,9 +10,6 @@ def _default_runtime_root() -> Path:
     if render_disk_path:
         return Path(render_disk_path) / "ai-article-saas"
 
-    if os.getenv("RENDER", "").strip().lower() == "true":
-        return Path("/var/data/ai-article-saas")
-
     return Path(".")
 
 

@@ -147,6 +147,7 @@ export default function SettingsPage() {
 
     const expectsOpenAiImageKey =
       imageSettings &&
+      form.ai_provider === "openai" &&
       (imageSettings.image_provider_mode === "openai" ||
         (imageSettings.image_provider_mode === "auto" && imageSettings.default_provider === "openai"));
     if (expectsOpenAiImageKey && !form.openai_api_key.trim()) {
@@ -313,6 +314,9 @@ export default function SettingsPage() {
                   <option value="openai">openai</option>
                   <option value="stability">stability</option>
                 </select>
+                <p className="mt-1 text-xs text-slate-500">
+                  若你本來就選 OpenAI 當文字供應商，圖片會直接共用同一組 OpenAI API Key，不需要再另外填第二組。
+                </p>
               </label>
 
               <label className="flex items-center gap-2 text-sm text-slate-700">

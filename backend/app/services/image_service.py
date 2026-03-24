@@ -103,8 +103,27 @@ def build_image_prompt(
 
 
 def build_placeholder_image_url(width: int, height: int, provider: str, style_preset: str) -> str:
-    tag = quote(f"{provider} | {style_preset} | {uuid4().hex[:6]}")
-    return f"https://placehold.co/{width}x{height}/E8F9F8/0D7F7A?text={tag}"
+    label = f"{provider} / {style_preset} / {uuid4().hex[:6]}"
+    svg = f"""
+    <svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#E8F9F8" />
+          <stop offset="100%" stop-color="#D7F1FF" />
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#bg)" rx="24" ry="24" />
+      <circle cx="{width * 0.82}" cy="{height * 0.2}" r="{max(40, min(width, height) * 0.08)}" fill="#B8ECE7" opacity="0.9" />
+      <circle cx="{width * 0.16}" cy="{height * 0.78}" r="{max(56, min(width, height) * 0.11)}" fill="#CFE9FF" opacity="0.85" />
+      <text x="8%" y="18%" fill="#0D7F7A" font-family="Arial, sans-serif" font-size="{max(26, width // 28)}" font-weight="700">
+        AI Image Mock
+      </text>
+      <text x="8%" y="30%" fill="#355C68" font-family="Arial, sans-serif" font-size="{max(18, width // 42)}">
+        {label}
+      </text>
+    </svg>
+    """.strip()
+    return f"data:image/svg+xml;charset=UTF-8,{quote(svg)}"
 
 
 def list_style_presets() -> list[dict[str, str]]:

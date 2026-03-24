@@ -4,7 +4,11 @@ import re
 from app.models.settings import Setting
 
 SUPPORTED_TEXT_PROVIDERS = {"openai", "anthropic", "gemini", "github"}
-PROVIDER_TIMEOUT_SECONDS = 75
+PROVIDER_CONNECT_TIMEOUT_SECONDS = 15
+PROVIDER_READ_TIMEOUT_SECONDS = 180
+PROVIDER_WRITE_TIMEOUT_SECONDS = 30
+PROVIDER_POOL_TIMEOUT_SECONDS = 30
+PROVIDER_MAX_RETRIES = 2
 
 
 def build_article_prompt(topic: str, outline: str, contexts: list[str], user_prompt: str | None = None) -> str:
@@ -84,25 +88,73 @@ def _provider_request_error(provider_label: str, err: Exception) -> RuntimeError
         return RuntimeError(f"{provider_label} 回應逾時，請稍後再試，或改用較快的模型")
     if isinstance(err, httpx.HTTPError):
         return RuntimeError(f"{provider_label} 連線失敗，請稍後再試")
+    message = str(err).lower()
+    if "timed out" in message or "timeout" in message:
+        return RuntimeError(f"{provider_label} 回應逾時，請稍後再試，或改用較快的模型")
     return RuntimeError(str(err))
 
 
+def _provider_timeout() -> httpx.Timeout:
+    return httpx.Timeout(
+        connect=PROVIDER_CONNECT_TIMEOUT_SECONDS,
+        read=PROVIDER_READ_TIMEOUT_SECONDS,
+        write=PROVIDER_WRITE_TIMEOUT_SECONDS,
+        pool=PROVIDER_POOL_TIMEOUT_SECONDS,
+    )
+
+
+def _is_retryable_response(response: httpx.Response) -> bool:
+    return response.status_code in {408, 429, 500, 502, 503, 504}
+
+
+def _post_with_retry(
+    *,
+    provider_label: str,
+    url: str,
+    headers: dict[str, str],
+    json: dict,
+    params: dict[str, str] | None = None,
+) -> httpx.Response:
+    last_error: Exception | None = None
+
+    for attempt in range(PROVIDER_MAX_RETRIES):
+        try:
+            response = httpx.post(
+                url,
+                headers=headers,
+                json=json,
+                params=params,
+                timeout=_provider_timeout(),
+            )
+        except Exception as err:
+            last_error = err
+            if attempt == PROVIDER_MAX_RETRIES - 1:
+                raise _provider_request_error(provider_label, err) from err
+            continue
+
+        if response.is_error and _is_retryable_response(response) and attempt < PROVIDER_MAX_RETRIES - 1:
+            continue
+
+        return response
+
+    if last_error is not None:
+        raise _provider_request_error(provider_label, last_error) from last_error
+    raise RuntimeError(f"{provider_label} 暫時無法取得回應")
+
+
 def _openai_generate(*, api_key: str, model: str, prompt: str) -> str:
-    try:
-        response = httpx.post(
-            "https://api.openai.com/v1/responses",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "input": prompt,
-            },
-            timeout=PROVIDER_TIMEOUT_SECONDS,
-        )
-    except Exception as err:
-        raise _provider_request_error("OpenAI", err) from err
+    response = _post_with_retry(
+        provider_label="OpenAI",
+        url="https://api.openai.com/v1/responses",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": model,
+            "input": prompt,
+        },
+    )
     if response.is_error:
         raise RuntimeError(_extract_error_message(response))
 
@@ -124,23 +176,20 @@ def _openai_generate(*, api_key: str, model: str, prompt: str) -> str:
 
 
 def _anthropic_generate(*, api_key: str, model: str, prompt: str) -> str:
-    try:
-        response = httpx.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": model,
-                "max_tokens": 4096,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=PROVIDER_TIMEOUT_SECONDS,
-        )
-    except Exception as err:
-        raise _provider_request_error("Anthropic", err) from err
+    response = _post_with_retry(
+        provider_label="Anthropic",
+        url="https://api.anthropic.com/v1/messages",
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        json={
+            "model": model,
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": prompt}],
+        },
+    )
     if response.is_error:
         raise RuntimeError(_extract_error_message(response))
 
@@ -155,23 +204,20 @@ def _anthropic_generate(*, api_key: str, model: str, prompt: str) -> str:
 
 
 def _gemini_generate(*, api_key: str, model: str, prompt: str) -> str:
-    try:
-        response = httpx.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-            params={"key": api_key},
-            headers={"Content-Type": "application/json"},
-            json={
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [{"text": prompt}],
-                    }
-                ],
-            },
-            timeout=PROVIDER_TIMEOUT_SECONDS,
-        )
-    except Exception as err:
-        raise _provider_request_error("Gemini", err) from err
+    response = _post_with_retry(
+        provider_label="Gemini",
+        url=f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+        params={"key": api_key},
+        headers={"Content-Type": "application/json"},
+        json={
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": prompt}],
+                }
+            ],
+        },
+    )
     if response.is_error:
         raise RuntimeError(_extract_error_message(response))
 
@@ -192,24 +238,21 @@ def _gemini_generate(*, api_key: str, model: str, prompt: str) -> str:
 
 
 def _github_generate(*, api_key: str, model: str, prompt: str) -> str:
-    try:
-        response = httpx.post(
-            "https://models.github.ai/inference/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7,
-            },
-            timeout=PROVIDER_TIMEOUT_SECONDS,
-        )
-    except Exception as err:
-        raise _provider_request_error("GitHub Models", err) from err
+    response = _post_with_retry(
+        provider_label="GitHub Models",
+        url="https://models.github.ai/inference/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        json={
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+        },
+    )
     if response.is_error:
         raise RuntimeError(_extract_error_message(response))
 

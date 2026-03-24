@@ -152,3 +152,36 @@ export type Entitlements = {
     knowledge_total_bytes: number;
   };
 };
+
+export type AdminStats = {
+  total_users: number;
+  new_users_7d: number;
+  total_paid_users: number;
+  active_paid_users: number;
+  active_trial_users: number;
+  total_articles: number;
+  articles_7d: number;
+  total_knowledge_files: number;
+  total_payments: number;
+  paid_payments: number;
+  paid_revenue_cents: number;
+  paid_revenue_twd: number;
+};
+
+export type AdminRecentUser = {
+  id: number;
+  email: string;
+  created_at: string;
+};
+
+export type AdminRecentPayment = {
+  payment_id: number;
+  user_id: number;
+  user_email?: string;
+  plan_code?: string;
+  amount_cents: number;
+  currency: string;
+  provider: string;
+  status: string;
+  created_at: string;
+};

@@ -102,23 +102,89 @@ def build_image_prompt(
     )
 
 
-def build_placeholder_image_url(width: int, height: int, provider: str, style_preset: str) -> str:
+def _safe_svg_text(text: str, fallback: str) -> str:
+    cleaned = re.sub(r"\s+", " ", (text or "").strip())
+    cleaned = cleaned[:48]
+    return cleaned or fallback
+
+
+def _style_palette(style_preset: str) -> dict[str, str]:
+    palettes = {
+        "blog_cover": {
+            "start": "#DBF5F2",
+            "end": "#BDE6FF",
+            "accent": "#0F766E",
+            "accent_soft": "#7DD3C7",
+            "panel": "#FFFFFF",
+            "panel_opacity": "0.78",
+        },
+        "expert_infographic": {
+            "start": "#DDE7FF",
+            "end": "#C6F3EA",
+            "accent": "#1D4ED8",
+            "accent_soft": "#60A5FA",
+            "panel": "#F8FAFC",
+            "panel_opacity": "0.82",
+        },
+        "emotional_story": {
+            "start": "#FFE2DB",
+            "end": "#FFEEC9",
+            "accent": "#BE4B49",
+            "accent_soft": "#F59E8B",
+            "panel": "#FFF9F4",
+            "panel_opacity": "0.8",
+        },
+        "knowledge_diagram": {
+            "start": "#E1F0FF",
+            "end": "#DDF8E6",
+            "accent": "#2563EB",
+            "accent_soft": "#7CC5FF",
+            "panel": "#F8FAFC",
+            "panel_opacity": "0.82",
+        },
+    }
+    return palettes.get(style_preset, palettes["blog_cover"])
+
+
+def build_placeholder_image_url(
+    width: int,
+    height: int,
+    provider: str,
+    style_preset: str,
+    article_topic: str,
+    text_content: str | None,
+) -> str:
+    palette = _style_palette(style_preset)
     label = f"{provider} / {style_preset} / {uuid4().hex[:6]}"
+    title = _safe_svg_text(text_content or article_topic, "AI 預覽封面")
+    subtitle = _safe_svg_text(article_topic, "Article Cover Preview")
     svg = f"""
     <svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
       <defs>
         <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#E8F9F8" />
-          <stop offset="100%" stop-color="#D7F1FF" />
+          <stop offset="0%" stop-color="{palette['start']}" />
+          <stop offset="100%" stop-color="{palette['end']}" />
         </linearGradient>
       </defs>
       <rect width="100%" height="100%" fill="url(#bg)" rx="24" ry="24" />
-      <circle cx="{width * 0.82}" cy="{height * 0.2}" r="{max(40, min(width, height) * 0.08)}" fill="#B8ECE7" opacity="0.9" />
-      <circle cx="{width * 0.16}" cy="{height * 0.78}" r="{max(56, min(width, height) * 0.11)}" fill="#CFE9FF" opacity="0.85" />
-      <text x="8%" y="18%" fill="#0D7F7A" font-family="Arial, sans-serif" font-size="{max(26, width // 28)}" font-weight="700">
-        AI Image Mock
+      <circle cx="{width * 0.82}" cy="{height * 0.18}" r="{max(40, min(width, height) * 0.08)}" fill="{palette['accent_soft']}" opacity="0.9" />
+      <circle cx="{width * 0.14}" cy="{height * 0.8}" r="{max(56, min(width, height) * 0.11)}" fill="{palette['accent_soft']}" opacity="0.5" />
+      <rect x="{width * 0.07}" y="{height * 0.12}" width="{width * 0.86}" height="{height * 0.7}" rx="28" fill="{palette['panel']}" opacity="{palette['panel_opacity']}" />
+      <rect x="{width * 0.11}" y="{height * 0.2}" width="{width * 0.34}" height="{height * 0.26}" rx="22" fill="{palette['accent']}" opacity="0.9" />
+      <rect x="{width * 0.49}" y="{height * 0.2}" width="{width * 0.36}" height="{height * 0.06}" rx="14" fill="{palette['accent_soft']}" opacity="0.95" />
+      <rect x="{width * 0.49}" y="{height * 0.3}" width="{width * 0.26}" height="{height * 0.045}" rx="12" fill="{palette['accent_soft']}" opacity="0.7" />
+      <rect x="{width * 0.49}" y="{height * 0.38}" width="{width * 0.3}" height="{height * 0.045}" rx="12" fill="{palette['accent_soft']}" opacity="0.55" />
+      <rect x="{width * 0.11}" y="{height * 0.54}" width="{width * 0.74}" height="{height * 0.11}" rx="18" fill="{palette['panel']}" opacity="0.92" />
+      <text x="11%" y="15%" fill="{palette['accent']}" font-family="Arial, sans-serif" font-size="{max(26, width // 28)}" font-weight="700">
+        Mock Preview
       </text>
-      <text x="8%" y="30%" fill="#355C68" font-family="Arial, sans-serif" font-size="{max(18, width // 42)}">
+      <text x="11%" y="60%" fill="{palette['accent']}" font-family="Arial, sans-serif" font-size="{max(34, width // 22)}" font-weight="700">
+        {title}
+      </text>
+      <text x="11%" y="69%" fill="#355C68" font-family="Arial, sans-serif" font-size="{max(18, width // 42)}">
+        {subtitle}
+      </text>
+      <text x="11%" y="78%" fill="#54717A" font-family="Arial, sans-serif" font-size="{max(16, width // 48)}">
         {label}
       </text>
     </svg>
@@ -201,7 +267,14 @@ def generate_image_plan(
                 "provider": provider,
                 "model": model,
                 "prompt": prompt,
-                "image_url": build_placeholder_image_url(width, height, provider, style_preset),
+                "image_url": build_placeholder_image_url(
+                    width,
+                    height,
+                    provider,
+                    style_preset,
+                    article_topic,
+                    text_content,
+                ),
                 "width": width,
                 "height": height,
                 "text_language": text_language,

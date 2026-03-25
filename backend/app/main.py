@@ -8,13 +8,9 @@ from fastapi.responses import JSONResponse
 
 from app.api import admin, articles, auth, billing, images, knowledge_files, publish, settings
 from app.core.config import settings as app_settings
-from app.core.database import Base, engine
-from app.core.migrations import run_startup_migrations
+from app.core.database import get_database_init_status, start_database_initialization_in_background
 
 logger = logging.getLogger("uvicorn.error")
-
-Base.metadata.create_all(bind=engine)
-run_startup_migrations(engine)
 
 app = FastAPI(title=app_settings.app_name)
 
@@ -43,15 +39,23 @@ def healthz():
         "database_backend": "sqlite" if app_settings.database_url.startswith("sqlite") else "server",
         "storage_dir": str(app_settings.storage_dir),
         "persistent_storage_enabled": app_settings.persistent_storage_enabled,
+        "database_init": get_database_init_status(),
     }
 
 
 @app.get("/readyz")
 def readyz():
+    db_init = get_database_init_status()
     return {
-        "status": "ready",
+        "status": "ready" if db_init["state"] == "ready" else "initializing",
         "database_backend": "sqlite" if app_settings.database_url.startswith("sqlite") else "server",
+        "database_init": db_init,
     }
+
+
+@app.on_event("startup")
+def start_background_services():
+    start_database_initialization_in_background()
 
 
 @app.middleware("http")

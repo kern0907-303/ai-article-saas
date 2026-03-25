@@ -34,6 +34,30 @@ const PROVIDER_DEFAULTS: Record<Settings["ai_provider"], { article: string; prom
   },
 };
 
+const FALLBACK_TEXT_MODELS: Record<Settings["ai_provider"], ModelCatalogItem[]> = {
+  openai: [
+    { key: "gpt-4.1-mini", provider: "openai", category: "text", label: "GPT-4.1 Mini", description: "", cost_tier: "low" },
+    { key: "gpt-4.1", provider: "openai", category: "text", label: "GPT-4.1", description: "", cost_tier: "high" },
+  ],
+  anthropic: [
+    { key: "claude-3-5-haiku-latest", provider: "anthropic", category: "text", label: "Claude 3.5 Haiku", description: "", cost_tier: "low" },
+    { key: "claude-3-5-sonnet-latest", provider: "anthropic", category: "text", label: "Claude 3.5 Sonnet", description: "", cost_tier: "medium" },
+  ],
+  gemini: [
+    { key: "gemini-1.5-flash", provider: "gemini", category: "text", label: "Gemini 1.5 Flash", description: "", cost_tier: "low" },
+    { key: "gemini-1.5-pro", provider: "gemini", category: "text", label: "Gemini 1.5 Pro", description: "", cost_tier: "high" },
+  ],
+  github: [
+    { key: "openai/gpt-4.1-mini", provider: "github", category: "text", label: "GitHub Models: GPT-4.1 Mini", description: "", cost_tier: "low" },
+    { key: "openai/gpt-4.1", provider: "github", category: "text", label: "GitHub Models: GPT-4.1", description: "", cost_tier: "high" },
+  ],
+};
+
+const FALLBACK_IMAGE_MODELS: ModelCatalogItem[] = [
+  { key: "gpt-image-1", provider: "openai", category: "image", label: "GPT Image 1", description: "", cost_tier: "medium" },
+  { key: "nano-banana-v1", provider: "nano_banana", category: "image", label: "Nano Banana v1", description: "", cost_tier: "medium" },
+];
+
 function getActiveProviderKey(form: {
   ai_provider: Settings["ai_provider"];
   openai_api_key: string;
@@ -89,29 +113,75 @@ export default function SettingsPage() {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    Promise.all([api.getSettings(), api.getImageSettings(), api.getModelCatalog()])
-      .then(([settingsData, imageData, modelData]) => {
-        if (settingsData) {
-          setForm({
-            ai_provider: settingsData.ai_provider || "openai",
-            openai_api_key: settingsData.openai_api_key || "",
-            anthropic_api_key: settingsData.anthropic_api_key || "",
-            gemini_api_key: settingsData.gemini_api_key || "",
-            github_api_key: settingsData.github_api_key || "",
-            website_api_key: settingsData.website_api_key || "",
-            social_api_key: settingsData.social_api_key || "",
-            article_model: settingsData.article_model || "gpt-4.1-mini",
-            prompt_model: settingsData.prompt_model || "gpt-4.1-mini",
-            image_model: settingsData.image_model || "gpt-image-1",
-            website_endpoint: settingsData.website_endpoint || "",
-            social_endpoint: settingsData.social_endpoint || "",
-            notes: settingsData.notes || "",
-          });
-        }
+    let mounted = true;
+
+    const fallbackImageSettings: ImageSettings = {
+      id: 0,
+      user_id: "",
+      image_provider_mode: "auto",
+      default_provider: "openai",
+      force_nano_banana_for_zh_text: true,
+      nano_banana_model: "nano-banana-v1",
+      openai_image_model: "gpt-image-1",
+      default_size: "1536x1024",
+      default_quality: "high",
+      output_format: "png",
+      images_per_article: 1,
+      zh_text_detection_keywords: "中文,繁體,標語,文案,海報,banner,封面文字,字卡",
+    };
+
+    setImageSettings(fallbackImageSettings);
+
+    api
+      .getSettings()
+      .then((settingsData) => {
+        if (!mounted || !settingsData) return;
+        setForm({
+          ai_provider: settingsData.ai_provider || "openai",
+          openai_api_key: settingsData.openai_api_key || "",
+          anthropic_api_key: settingsData.anthropic_api_key || "",
+          gemini_api_key: settingsData.gemini_api_key || "",
+          github_api_key: settingsData.github_api_key || "",
+          website_api_key: settingsData.website_api_key || "",
+          social_api_key: settingsData.social_api_key || "",
+          article_model: settingsData.article_model || "gpt-4.1-mini",
+          prompt_model: settingsData.prompt_model || "gpt-4.1-mini",
+          image_model: settingsData.image_model || "gpt-image-1",
+          website_endpoint: settingsData.website_endpoint || "",
+          social_endpoint: settingsData.social_endpoint || "",
+          notes: settingsData.notes || "",
+        });
+      })
+      .catch((err: Error) => {
+        if (!mounted) return;
+        setStatus(`部分設定讀取失敗：${err.message}`);
+      });
+
+    api
+      .getImageSettings()
+      .then((imageData) => {
+        if (!mounted) return;
         setImageSettings(imageData);
+      })
+      .catch((err: Error) => {
+        if (!mounted) return;
+        setStatus((prev) => prev || `圖片設定讀取失敗，已先載入預設值：${err.message}`);
+      });
+
+    api
+      .getModelCatalog()
+      .then((modelData) => {
+        if (!mounted) return;
         setModelCatalog(modelData.models || []);
       })
-      .catch((err: Error) => setStatus(`讀取失敗：${err.message}`));
+      .catch((err: Error) => {
+        if (!mounted) return;
+        setStatus((prev) => prev || `模型清單讀取失敗，已先使用預設值：${err.message}`);
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const textModels = useMemo(
@@ -119,22 +189,24 @@ export default function SettingsPage() {
     [form.ai_provider, modelCatalog],
   );
   const imageModels = useMemo(() => modelCatalog.filter((m) => m.category === "image"), [modelCatalog]);
+  const effectiveTextModels = textModels.length > 0 ? textModels : FALLBACK_TEXT_MODELS[form.ai_provider];
+  const effectiveImageModels = imageModels.length > 0 ? imageModels : FALLBACK_IMAGE_MODELS;
   const providerConfig = PROVIDER_DEFAULTS[form.ai_provider];
 
   useEffect(() => {
-    if (textModels.length === 0) return;
+    if (effectiveTextModels.length === 0) return;
 
     setForm((prev) => {
       const next = { ...prev };
-      if (!textModels.some((model) => model.key === prev.article_model)) {
+      if (!effectiveTextModels.some((model) => model.key === prev.article_model)) {
         next.article_model = PROVIDER_DEFAULTS[prev.ai_provider].article;
       }
-      if (!textModels.some((model) => model.key === prev.prompt_model)) {
+      if (!effectiveTextModels.some((model) => model.key === prev.prompt_model)) {
         next.prompt_model = PROVIDER_DEFAULTS[prev.ai_provider].prompt;
       }
       return next;
     });
-  }, [textModels]);
+  }, [effectiveTextModels]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -247,19 +319,19 @@ export default function SettingsPage() {
             <Select
               label="文章生成模型"
               value={form.article_model}
-              options={textModels}
+              options={effectiveTextModels}
               onChange={(v) => setForm({ ...form, article_model: v })}
             />
             <Select
               label="提示詞擴寫模型"
               value={form.prompt_model}
-              options={textModels}
+              options={effectiveTextModels}
               onChange={(v) => setForm({ ...form, prompt_model: v })}
             />
             <Select
               label="圖片模型"
               value={form.image_model}
-              options={imageModels}
+              options={effectiveImageModels}
               onChange={(v) => setForm({ ...form, image_model: v })}
             />
           </div>

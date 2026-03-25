@@ -6,9 +6,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import admin, articles, auth, billing, images, knowledge_files, publish, settings
+from app.api import articles, auth, billing, images, knowledge_files, publish, settings
 from app.core.config import settings as app_settings
 from app.core.database import get_database_init_status, start_database_initialization_in_background
+
+try:
+    from app.api import admin
+except ImportError:
+    admin = None
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -86,4 +91,5 @@ app.include_router(knowledge_files.router, prefix=app_settings.api_prefix)
 app.include_router(articles.router, prefix=app_settings.api_prefix)
 app.include_router(images.router, prefix=app_settings.api_prefix)
 app.include_router(publish.router, prefix=app_settings.api_prefix)
-app.include_router(admin.router, prefix=app_settings.api_prefix)
+if admin is not None:
+    app.include_router(admin.router, prefix=app_settings.api_prefix)

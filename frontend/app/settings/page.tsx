@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
-import { ImageSettings, ModelCatalogItem, Settings } from "@/lib/types";
+import { ModelCatalogItem, Settings } from "@/lib/types";
 
 const PROVIDER_DEFAULTS: Record<Settings["ai_provider"], { article: string; prompt: string; keyHint: string; keyPlaceholder: string }> = {
   openai: {
@@ -108,29 +108,12 @@ export default function SettingsPage() {
     social_endpoint: "",
     notes: "",
   });
-  const [imageSettings, setImageSettings] = useState<ImageSettings | null>(null);
   const [modelCatalog, setModelCatalog] = useState<ModelCatalogItem[]>([]);
   const [status, setStatus] = useState("");
+  const [showAdvancedPublish, setShowAdvancedPublish] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-
-    const fallbackImageSettings: ImageSettings = {
-      id: 0,
-      user_id: "",
-      image_provider_mode: "auto",
-      default_provider: "openai",
-      force_nano_banana_for_zh_text: true,
-      nano_banana_model: "nano-banana-v1",
-      openai_image_model: "gpt-image-1",
-      default_size: "1536x1024",
-      default_quality: "high",
-      output_format: "png",
-      images_per_article: 1,
-      zh_text_detection_keywords: "中文,繁體,標語,文案,海報,banner,封面文字,字卡",
-    };
-
-    setImageSettings(fallbackImageSettings);
 
     api
       .getSettings()
@@ -155,17 +138,6 @@ export default function SettingsPage() {
       .catch((err: Error) => {
         if (!mounted) return;
         setStatus(`部分設定讀取失敗：${err.message}`);
-      });
-
-    api
-      .getImageSettings()
-      .then((imageData) => {
-        if (!mounted) return;
-        setImageSettings(imageData);
-      })
-      .catch((err: Error) => {
-        if (!mounted) return;
-        setStatus((prev) => prev || `圖片設定讀取失敗，已先載入預設值：${err.message}`);
       });
 
     api
@@ -220,13 +192,6 @@ export default function SettingsPage() {
     setStatus("儲存中...");
     try {
       await api.saveSettings(form);
-      if (imageSettings) {
-        await api.saveImageSettings({
-          ...imageSettings,
-          openai_image_model: form.image_model.startsWith("gpt-image") ? form.image_model : imageSettings.openai_image_model,
-          nano_banana_model: form.image_model.startsWith("nano-banana") ? form.image_model : imageSettings.nano_banana_model,
-        });
-      }
       setStatus("儲存成功，現在可前往「文章創作與發布」測試。 ");
     } catch (err) {
       setStatus(`儲存失敗：${(err as Error).message}`);
@@ -313,7 +278,7 @@ export default function SettingsPage() {
         />
 
         <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">
-          <h3 className="font-semibold text-[#0f766e]">AI 模型選擇（依供應商切換）</h3>
+          <h3 className="font-semibold text-[#0f766e]">核心模型設定</h3>
           <p className="text-xs text-slate-600">目前供應商：{form.ai_provider}</p>
           <div className="grid md:grid-cols-3 gap-3">
             <Select
@@ -336,7 +301,7 @@ export default function SettingsPage() {
             />
           </div>
           <p className="text-xs text-slate-600">成本層級：low（低）/ medium（中）/ high（高）</p>
-          <p className="text-xs text-slate-500">若切換供應商，文章與提示詞模型會自動換成對應的預設值。</p>
+          <p className="text-xs text-slate-500">圖片生成已改成自動最佳化，不再需要另外設定一堆圖片後台參數。</p>
           {form.ai_provider === "github" && (
             <div className="rounded-lg border border-dashed border-[#b9dedd] bg-white/70 p-3 space-y-3">
               <p className="text-xs text-slate-600">
@@ -358,112 +323,71 @@ export default function SettingsPage() {
           )}
         </div>
 
-        <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">
-          <h3 className="font-semibold text-[#0f766e]">圖片生成後台設定（含 nano banana 中文優先）</h3>
-          {imageSettings && (
-            <>
-              <label className="block text-sm font-medium text-slate-700">
-                Provider 模式
-                <select
-                  className="mt-1 w-full rounded-lg border border-slate-300 p-2"
-                  value={imageSettings.image_provider_mode}
-                  onChange={(e) =>
-                    setImageSettings({ ...imageSettings, image_provider_mode: e.target.value as ImageSettings["image_provider_mode"] })
-                  }
-                >
-                  <option value="auto">auto（建議）</option>
-                  <option value="nano_banana">nano_banana</option>
-                  <option value="openai">openai</option>
-                  <option value="stability">stability</option>
-                </select>
-                <p className="mt-1 text-xs text-slate-500">
-                  系統會自動選最合理路徑：有 OpenAI Key 就走真實生圖，沒有時會自動退回預覽圖，不需要你手動理解 provider 差異。
-                </p>
-              </label>
+        <div className="rounded-xl border border-[#d8eaea] bg-white/80 p-4 space-y-3">
+          <button
+            type="button"
+            className="text-sm font-semibold text-slate-700"
+            onClick={() => setShowAdvancedPublish((prev) => !prev)}
+          >
+            {showAdvancedPublish ? "收合進階發布設定" : "展開進階發布設定"}
+          </button>
+          <p className="text-xs text-slate-500">只有要發布到網站或社群時，才需要填下面欄位。</p>
 
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={imageSettings.force_nano_banana_for_zh_text}
-                  onChange={(e) =>
-                    setImageSettings({ ...imageSettings, force_nano_banana_for_zh_text: e.target.checked })
-                  }
-                />
-                中文文字需求時強制走 nano banana（建議開啟）
-              </label>
-
-              <div className="grid md:grid-cols-2 gap-3">
-                <InputSimple
-                  label="每篇預設圖片數"
-                  value={String(imageSettings.images_per_article)}
-                  onChange={(v) => setImageSettings({ ...imageSettings, images_per_article: Number(v) || 1 })}
-                />
-                <InputSimple
-                  label="預設尺寸"
-                  value={imageSettings.default_size}
-                  onChange={(v) => setImageSettings({ ...imageSettings, default_size: v })}
-                />
-              </div>
-
-              <InputSimple
-                label="中文文字偵測關鍵字（逗號分隔）"
-                value={imageSettings.zh_text_detection_keywords}
-                onChange={(v) => setImageSettings({ ...imageSettings, zh_text_detection_keywords: v })}
+          {showAdvancedPublish && (
+            <div className="space-y-4">
+              <Input
+                label="個人網頁 API Key"
+                value={form.website_api_key}
+                onChange={(v) => setForm({ ...form, website_api_key: v })}
+                hint="選填（若需發布到網站則必填）。"
+                linkText="👉 網站 API Key 取得流程與權限設定"
+                linkHref="/help/api-setup#website"
+                placeholder="your-website-key"
               />
-            </>
+
+              <Input
+                label="社交平台 API Key"
+                value={form.social_api_key}
+                onChange={(v) => setForm({ ...form, social_api_key: v })}
+                hint="選填（若需發布到社群則必填）。"
+                linkText="👉 社群平台授權與 API Key 設定"
+                linkHref="/help/api-setup#social"
+                placeholder="your-social-key"
+              />
+
+              <Input
+                label="個人網頁 Endpoint"
+                value={form.website_endpoint}
+                onChange={(v) => setForm({ ...form, website_endpoint: v })}
+                hint="你的網站接收文章發布的 API 網址。"
+                linkText="👉 Endpoint 格式範例與測試方式"
+                linkHref="/help/api-setup#endpoint-example"
+                placeholder="https://api.yoursite.com/publish"
+              />
+
+              <Input
+                label="社交平台 Endpoint"
+                value={form.social_endpoint}
+                onChange={(v) => setForm({ ...form, social_endpoint: v })}
+                hint="你的社群代理服務接收文章的 API 網址。"
+                linkText="👉 Endpoint 格式範例與測試方式"
+                linkHref="/help/api-setup#endpoint-example"
+                placeholder="https://api.social.com/post"
+              />
+
+              <label className="block text-sm font-medium text-slate-700">
+                備註
+                <textarea
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+                  rows={4}
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  placeholder="例如：這組金鑰是測試環境，僅供內部驗證。"
+                />
+              </label>
+            </div>
           )}
         </div>
-
-        <Input
-          label="個人網頁 API Key"
-          value={form.website_api_key}
-          onChange={(v) => setForm({ ...form, website_api_key: v })}
-          hint="選填（若需發布到網站則必填）。"
-          linkText="👉 網站 API Key 取得流程與權限設定"
-          linkHref="/help/api-setup#website"
-          placeholder="your-website-key"
-        />
-
-        <Input
-          label="社交平台 API Key"
-          value={form.social_api_key}
-          onChange={(v) => setForm({ ...form, social_api_key: v })}
-          hint="選填（若需發布到社群則必填）。"
-          linkText="👉 社群平台授權與 API Key 設定"
-          linkHref="/help/api-setup#social"
-          placeholder="your-social-key"
-        />
-
-        <Input
-          label="個人網頁 Endpoint"
-          value={form.website_endpoint}
-          onChange={(v) => setForm({ ...form, website_endpoint: v })}
-          hint="你的網站接收文章發布的 API 網址。"
-          linkText="👉 Endpoint 格式範例與測試方式"
-          linkHref="/help/api-setup#endpoint-example"
-          placeholder="https://api.yoursite.com/publish"
-        />
-
-        <Input
-          label="社交平台 Endpoint"
-          value={form.social_endpoint}
-          onChange={(v) => setForm({ ...form, social_endpoint: v })}
-          hint="你的社群代理服務接收文章的 API 網址。"
-          linkText="👉 Endpoint 格式範例與測試方式"
-          linkHref="/help/api-setup#endpoint-example"
-          placeholder="https://api.social.com/post"
-        />
-
-        <label className="block text-sm font-medium text-slate-700">
-          備註
-          <textarea
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
-            rows={4}
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            placeholder="例如：這組金鑰是測試環境，僅供內部驗證。"
-          />
-        </label>
 
         <div className="flex items-center gap-3 flex-wrap">
           <button type="submit" className="brand-btn px-4 py-2">

@@ -128,7 +128,7 @@ export default function BillingPage() {
         </div>
 
         {checkout && (
-          <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-2 text-sm">
+          <div className="rounded-xl border border-[var(--line)] bg-[linear-gradient(135deg,#fff6dc,#ffe1af)] p-4 space-y-2 text-sm">
             <p>交易編號：{checkout.txn_id}</p>
             <p>
               金額：{(checkout.amount_cents / 100).toLocaleString()} {checkout.currency}

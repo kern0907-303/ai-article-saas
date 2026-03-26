@@ -80,7 +80,7 @@ export default function ApiSetupHelpPage() {
         <ul className="space-y-2 text-sm text-slate-700">
           {checklist.map((item) => (
             <li key={item} className="flex items-start gap-2">
-              <span className="mt-[2px] text-[#0a9e99]">✓</span>
+              <span className="mt-[2px] text-[#ff7b00]">✓</span>
               <span>{item}</span>
             </li>
           ))}

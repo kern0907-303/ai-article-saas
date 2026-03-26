@@ -277,8 +277,8 @@ export default function SettingsPage() {
           placeholder={form.ai_provider === "github" ? providerConfig.keyPlaceholder : "ghp_... / github_pat_..."}
         />
 
-        <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">
-          <h3 className="font-semibold text-[#0f766e]">核心模型設定</h3>
+        <div className="rounded-xl border border-[var(--line)] bg-[linear-gradient(135deg,#fff6da,#ffe0ab)] p-4 space-y-3">
+          <h3 className="font-semibold text-[var(--text)]">核心模型設定</h3>
           <p className="text-xs text-slate-600">目前供應商：{form.ai_provider}</p>
           <div className="grid md:grid-cols-3 gap-3">
             <Select
@@ -303,7 +303,7 @@ export default function SettingsPage() {
           <p className="text-xs text-slate-600">成本層級：low（低）/ medium（中）/ high（高）</p>
           <p className="text-xs text-slate-500">圖片生成已改成自動最佳化，不再需要另外設定一堆圖片後台參數。</p>
           {form.ai_provider === "github" && (
-            <div className="rounded-lg border border-dashed border-[#b9dedd] bg-white/70 p-3 space-y-3">
+            <div className="rounded-lg border border-dashed border-[#efb24e] bg-white/70 p-3 space-y-3">
               <p className="text-xs text-slate-600">
                 GitHub Models 可直接選常用模型，也可手動輸入 model ID。若 GitHub 更新模型清單，你可以直接覆蓋下面欄位。
               </p>
@@ -323,7 +323,7 @@ export default function SettingsPage() {
           )}
         </div>
 
-        <div className="rounded-xl border border-[#d8eaea] bg-white/80 p-4 space-y-3">
+        <div className="rounded-xl border border-[var(--line)] bg-[rgba(255,248,231,0.82)] p-4 space-y-3">
           <button
             type="button"
             className="text-sm font-semibold text-slate-700"

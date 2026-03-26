@@ -1,52 +1,143 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #eef8f8;
-  --panel: #ffffff;
-  --text: #1e293b;
-  --brand: #0abab5;
-  --brand-strong: #0a9e99;
-  --brand-soft: #d8f3f2;
-  --line: #d7e4e8;
+  --bg: #fff3b2;
+  --bg-warm: #ffd9a6;
+  --panel: rgba(255, 249, 239, 0.94);
+  --panel-strong: #fff6e9;
+  --text: #602f08;
+  --text-soft: #8b4f1f;
+  --brand: #ffbe0b;
+  --brand-strong: #ff7b00;
+  --brand-accent: #ff5a36;
+  --brand-soft: #ffe39c;
+  --line: #f3c56f;
+  --line-strong: #ef9a2f;
+  --shadow: rgba(176, 94, 6, 0.16);
+}
+
+html {
+  min-height: 100%;
 }
 
 body {
   margin: 0;
+  min-height: 100%;
+  position: relative;
   background:
-    radial-gradient(circle at 0% 0%, #c9f1ee 0%, transparent 35%),
-    radial-gradient(circle at 100% 20%, #d8f4ff 0%, transparent 30%),
-    linear-gradient(180deg, #f7fcfc 0%, var(--bg) 70%);
+    radial-gradient(circle at top left, rgba(255, 244, 142, 0.96) 0%, transparent 28%),
+    radial-gradient(circle at 100% 12%, rgba(255, 165, 71, 0.48) 0%, transparent 26%),
+    radial-gradient(circle at 18% 100%, rgba(255, 99, 71, 0.28) 0%, transparent 32%),
+    linear-gradient(135deg, #fff9d0 0%, var(--bg) 38%, var(--bg-warm) 100%);
   color: var(--text);
   font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: auto;
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(10px);
+}
+
+body::before {
+  top: 12%;
+  right: 6%;
+  width: 240px;
+  height: 240px;
+  border-radius: 9999px;
+  background: rgba(255, 109, 0, 0.18);
+}
+
+body::after {
+  left: -4%;
+  bottom: 6%;
+  width: 280px;
+  height: 280px;
+  border-radius: 9999px;
+  background: rgba(255, 196, 0, 0.18);
+}
+
+::selection {
+  background: rgba(255, 123, 0, 0.22);
+  color: #4a2100;
 }
 
 textarea {
   resize: vertical;
 }
 
+a {
+  transition: color 0.18s ease;
+}
+
+input,
+select,
+textarea {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: var(--line);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #c07f46;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--line-strong);
+  box-shadow:
+    0 0 0 4px rgba(255, 190, 11, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+input[type="checkbox"] {
+  accent-color: var(--brand-strong);
+}
+
 .card-surface {
-  background: var(--panel);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, transparent 100%),
+    var(--panel);
   border: 1px solid var(--line);
   border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(13, 40, 52, 0.06);
+  box-shadow:
+    0 16px 38px var(--shadow),
+    0 2px 0 rgba(255, 255, 255, 0.45) inset;
+  backdrop-filter: blur(12px);
 }
 
 .brand-btn {
-  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-strong) 100%);
-  color: #ffffff;
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-strong) 58%, var(--brand-accent) 100%);
+  color: #fffaf4;
   border-radius: 10px;
-  transition: filter 0.15s ease;
+  border: 1px solid rgba(215, 108, 0, 0.45);
+  box-shadow: 0 12px 24px rgba(255, 123, 0, 0.22);
+  transition:
+    filter 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .brand-btn:hover {
   filter: brightness(0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(255, 123, 0, 0.28);
 }
 
 .brand-btn-secondary {
-  background: var(--brand-soft);
-  color: #0f766e;
-  border: 1px solid #b9e6e3;
+  background: linear-gradient(135deg, #fff2c7 0%, #ffdca0 100%);
+  color: #8f4308;
+  border: 1px solid #efb24e;
   border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.12);
 }
 
 .brand-btn-danger {
@@ -62,19 +153,24 @@ textarea {
 }
 
 .brand-link {
-  color: #0e8b86;
+  color: #cc5600;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.brand-link:hover {
+  color: #a94400;
 }
 
 .brand-pill {
   display: inline-flex;
   align-items: center;
-  border: 1px solid #c0e9e6;
+  border: 1px solid #efb24e;
   border-radius: 9999px;
-  background: #f2fbfb;
-  color: #0c6f6b;
+  background: linear-gradient(135deg, #fff4c7 0%, #ffd697 100%);
+  color: #8f4308;
   padding: 2px 10px;
   font-size: 12px;
   font-weight: 600;
+  box-shadow: 0 8px 16px rgba(255, 190, 11, 0.14);
 }

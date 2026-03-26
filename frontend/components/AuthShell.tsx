@@ -42,11 +42,11 @@ export default function AuthShell({ children }: { children: ReactNode }) {
   }, [hydrated, token, isPublicRoute, router]);
 
   if (!hydrated || redirecting) {
-    return <div className="min-h-screen flex items-center justify-center text-slate-500">載入中...</div>;
+    return <div className="flex min-h-screen items-center justify-center text-[var(--text-soft)]">載入中...</div>;
   }
 
   if (isPublicRoute) {
-    return <main className="min-h-screen p-4 md:p-8">{children}</main>;
+    return <main className="min-h-screen p-4 md:p-8"><div className="mx-auto max-w-6xl">{children}</div></main>;
   }
 
   return (

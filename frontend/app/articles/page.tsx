@@ -347,7 +347,7 @@ export default function ArticlesPage() {
       <div className="card-surface p-6 space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-2xl font-bold">文章創作與發布</h2>
-          <span className="brand-pill">Tiffany Blue Workflow</span>
+          <span className="brand-pill">Dopamine Orange Workflow</span>
         </div>
         <p className="text-slate-700">從提示詞、生成、編修到發布，一頁完成內容工作流。</p>
       </div>
@@ -375,8 +375,8 @@ export default function ArticlesPage() {
                 onClick={() => toggleFile(file.id)}
                 className={`rounded-full border px-3 py-1 text-sm transition ${
                   selectedIds.includes(file.id)
-                    ? "bg-[#0abab5] text-white border-[#0abab5]"
-                    : "bg-white text-slate-700 border-slate-300 hover:bg-[#f0fbfa]"
+                    ? "border-[#f09a29] bg-[linear-gradient(135deg,#ffbe0b,#ff7b00)] text-white"
+                    : "bg-white/80 text-slate-700 border-[var(--line)] hover:bg-[#fff0c9]"
                 }`}
               >
                 {file.file_name}
@@ -401,7 +401,7 @@ export default function ArticlesPage() {
           </select>
         </label>
 
-        <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-2">
+        <div className="rounded-xl border border-[var(--line)] bg-[linear-gradient(135deg,#fff6da,#ffe2af)] p-4 space-y-2">
           <label className="block text-sm font-medium">
             一句話需求（AI 會幫你擴寫成精準提示詞）
             <input
@@ -451,7 +451,7 @@ export default function ArticlesPage() {
           />
         </label>
 
-        {status && <p className="rounded-xl border border-[var(--line)] bg-[#f8fbfb] px-4 py-3 text-sm text-slate-700">{status}</p>}
+        {status && <p className="rounded-xl border border-[var(--line)] bg-[rgba(255,247,221,0.9)] px-4 py-3 text-sm text-slate-700">{status}</p>}
 
         <button
           onClick={generate}
@@ -482,8 +482,8 @@ export default function ArticlesPage() {
       <div className="card-surface p-6 space-y-4">
         <h3 className="text-lg font-semibold">區塊三：發布 + 配圖</h3>
 
-        <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-4 space-y-3">
-          <p className="text-sm font-semibold text-[#0f766e]">AI 圖片生成（中文文字需求自動走 nano banana）</p>
+        <div className="rounded-xl border border-[var(--line)] bg-[linear-gradient(135deg,#fff5d3,#ffdca1)] p-4 space-y-3">
+          <p className="text-sm font-semibold text-[var(--text)]">AI 圖片生成（中文文字需求自動走 nano banana）</p>
           <p className="text-xs text-slate-600">系統會自動選最合理路徑：可用時優先走 OpenAI 真實生圖，不可用時自動退回預覽 mock 圖。</p>
           <div className="grid md:grid-cols-2 gap-3">
             <label className="block text-sm font-medium">

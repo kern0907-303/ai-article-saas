@@ -54,8 +54,8 @@ export default function ForgotPasswordPage() {
 
         {status && <p className="text-sm text-slate-600">{status}</p>}
         {resetToken && (
-          <div className="rounded-xl border border-[#c7ebe8] bg-[#f3fbfb] p-3 text-sm space-y-2">
-            <p className="font-semibold text-[#0f766e]">測試用重設 Token（正式版請走 Email）</p>
+          <div className="rounded-xl border border-[var(--line)] bg-[linear-gradient(135deg,#fff6d8,#ffe1b5)] p-3 text-sm space-y-2">
+            <p className="font-semibold text-[var(--text)]">測試用重設 Token（正式版請走 Email）</p>
             <code className="block break-all text-xs text-slate-700">{resetToken}</code>
             <Link href={`/reset-password?token=${encodeURIComponent(resetToken)}`} className="brand-link text-xs">
               直接帶入重設頁

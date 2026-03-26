@@ -10,6 +10,7 @@ const navItems = [
   { href: "/billing", label: "訂閱與付款" },
   { href: "/knowledge", label: "個人知識庫" },
   { href: "/articles", label: "文章創作與發布" },
+  { href: "/admin", label: "後台儀表板" },
 ];
 
 export default function Sidebar() {
@@ -22,10 +23,10 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-full md:w-64 bg-white/85 border-r border-[var(--line)] p-5 backdrop-blur-sm">
+    <aside className="w-full md:w-64 border-r border-[var(--line)] bg-[linear-gradient(180deg,rgba(255,251,240,0.96),rgba(255,226,163,0.82))] p-5 backdrop-blur-md">
       <span className="brand-pill">Pro 工作台</span>
-      <h1 className="text-xl font-bold text-[#0d7f7a] mt-2">AI 文章 SaaS</h1>
-      <p className="text-sm text-slate-500 mt-1">設定、生成、發布一站完成</p>
+      <h1 className="mt-2 text-xl font-bold text-[var(--text)]">AI 文章 SaaS</h1>
+      <p className="mt-1 text-sm text-[var(--text-soft)]">設定、生成、發布一站完成</p>
 
       <nav className="mt-6 space-y-2">
         {navItems.map((item) => {
@@ -35,7 +36,9 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={`block rounded-lg px-3 py-2 text-sm font-medium transition ${
-                active ? "bg-[#0abab5] text-white shadow-sm" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                active
+                  ? "border border-[#f09a29] bg-[linear-gradient(135deg,#ffbe0b,#ff7b00)] text-white shadow-[0_10px_24px_rgba(255,123,0,0.22)]"
+                  : "border border-transparent bg-white/65 text-[var(--text-soft)] hover:border-[#f3c56f] hover:bg-white/85"
               }`}
             >
               {item.label}
@@ -47,7 +50,7 @@ export default function Sidebar() {
       <button
         type="button"
         onClick={logout}
-        className="mt-6 w-full rounded-lg border border-[#bde6e3] bg-[#f0fbfa] px-3 py-2 text-sm text-[#0d7f7a] hover:bg-[#e2f6f5]"
+        className="mt-6 w-full rounded-lg border border-[#efb24e] bg-white/72 px-3 py-2 text-sm text-[var(--text)] transition hover:bg-white/90"
       >
         登出
       </button>

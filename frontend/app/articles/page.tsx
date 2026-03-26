@@ -347,7 +347,7 @@ export default function ArticlesPage() {
       <div className="card-surface p-6 space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-2xl font-bold">文章創作與發布</h2>
-          <span className="brand-pill">Dopamine Orange Workflow</span>
+          <span className="brand-pill">Created by Eric</span>
         </div>
         <p className="text-slate-700">從提示詞、生成、編修到發布，一頁完成內容工作流。</p>
       </div>

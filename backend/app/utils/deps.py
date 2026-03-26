@@ -1,11 +1,12 @@
 from datetime import datetime
 
 import jwt
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.config import settings as app_settings
 from app.core.security import decode_access_token
 from app.models.user import User
 from app.services.rate_limit_service import check_rate_limit
@@ -66,4 +67,16 @@ def require_active_subscription(
     if not expires_at or expires_at <= datetime.utcnow():
         raise HTTPException(status_code=402, detail="訂閱已到期，請續費後使用")
 
+    return current_user
+
+
+def require_admin_access(
+    current_user: User = Depends(get_current_user),
+    x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
+) -> User:
+    configured_key = (app_settings.admin_api_key or "").strip()
+    if not configured_key or configured_key == "change-admin-key-in-production":
+        raise HTTPException(status_code=503, detail="管理員功能尚未完成設定")
+    if not x_admin_key or x_admin_key != configured_key:
+        raise HTTPException(status_code=403, detail="管理員驗證失敗")
     return current_user

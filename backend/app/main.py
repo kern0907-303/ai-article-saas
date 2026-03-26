@@ -19,6 +19,12 @@ logger = logging.getLogger("uvicorn.error")
 
 app = FastAPI(title=app_settings.app_name)
 
+if app_settings.database_url.startswith("sqlite") and not app_settings.persistent_storage_enabled:
+    logger.warning(
+        "Database is using SQLite without persistent storage. Data may be lost after redeploys or restarts. "
+        "Set DATABASE_URL to PostgreSQL for production, or attach persistent disk storage."
+    )
+
 allowed_origins = [o.strip() for o in app_settings.cors_origins.split(",") if o.strip()]
 if not allowed_origins:
     allowed_origins = ["*"]

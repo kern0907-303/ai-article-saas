@@ -200,6 +200,54 @@ NEXT_PUBLIC_DEMO_USER_ID=demo-user
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001/api
 ```
 
+## 生產環境資料持久化
+
+如果你發現網站一更新、後端一重啟，會員帳號就像不存在，需要重新註冊，通常不是登入頁問題，而是後端資料庫沒有持久化。
+
+目前後端設定邏輯如下：
+- 若有 `DATABASE_URL`，優先使用資料庫服務（建議 PostgreSQL）
+- 若沒有 `DATABASE_URL`，會退回本機 SQLite `app.db`
+- 在雲端平台若沒有 Persistent Disk 或外部資料庫，SQLite 檔案很容易在 redeploy 後消失
+
+正式環境建議至少設定以下後端環境變數：
+
+```bash
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB_NAME
+JWT_SECRET_KEY=請填固定且夠長的隨機字串
+ENCRYPTION_SECRET=請填固定密鑰
+ADMIN_API_KEY=請填固定且夠長的管理金鑰
+CORS_ORIGINS=https://你的前端網域
+```
+
+### Render 部署建議
+
+本 repo 已新增根目錄 `render.yaml`，會自動建立：
+- 1 個 PostgreSQL 資料庫
+- 1 個 FastAPI backend 服務
+- 並把 backend 的 `DATABASE_URL` 直接綁到 PostgreSQL
+
+部署時只要：
+
+1. 將 repo 連到 Render
+2. 使用 Blueprint / `render.yaml`
+3. 把 `CORS_ORIGINS` 改成你的前端網址
+4. 前端 `NEXT_PUBLIC_API_BASE_URL` 指向 Render backend，例如：
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=https://your-backend.onrender.com/api
+```
+
+### 本機開發
+
+可參考 `backend/.env.example` 建立 `backend/.env`：
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+如果只是本機測試，不填 `DATABASE_URL` 也可以，系統會用 SQLite；
+但如果要避免資料因環境更新消失，正式環境請改用 PostgreSQL。
+
 ## 補充：未來商業化擴充建議
 
 - 導入 JWT / OAuth（取代 `x-user-id`）

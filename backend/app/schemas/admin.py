@@ -24,6 +24,28 @@ class AdminRecentUserOut(BaseModel):
     created_at: datetime
 
 
+class AdminAccountStorageStatusOut(BaseModel):
+    database_backend: str
+    persistent_storage_enabled: bool
+    require_persistent_database: bool
+    account_data_safe: bool
+    storage_dir: str
+    warning: str | None = None
+
+
+class AdminAccountOut(BaseModel):
+    id: int
+    email: str
+    created_at: datetime
+    updated_at: datetime
+    subscription_status: str
+    access_tier: str
+    expires_at: datetime | None = None
+    article_count: int
+    knowledge_file_count: int
+    payment_count: int
+
+
 class AdminRecentPaymentOut(BaseModel):
     payment_id: int
     user_id: int

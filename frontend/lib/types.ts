@@ -189,6 +189,28 @@ export type AdminRecentUser = {
   created_at: string;
 };
 
+export type AdminAccountStorageStatus = {
+  database_backend: string;
+  persistent_storage_enabled: boolean;
+  require_persistent_database: boolean;
+  account_data_safe: boolean;
+  storage_dir: string;
+  warning?: string;
+};
+
+export type AdminAccount = {
+  id: number;
+  email: string;
+  created_at: string;
+  updated_at: string;
+  subscription_status: string;
+  access_tier: string;
+  expires_at?: string;
+  article_count: number;
+  knowledge_file_count: number;
+  payment_count: number;
+};
+
 export type AdminRecentPayment = {
   payment_id: number;
   user_id: number;

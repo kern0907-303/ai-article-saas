@@ -233,8 +233,16 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB_NAME
 JWT_SECRET_KEY=請填固定且夠長的隨機字串
 ENCRYPTION_SECRET=請填固定密鑰
 ADMIN_API_KEY=請填固定且夠長的管理金鑰
+REQUIRE_PERSISTENT_DATABASE=true
 CORS_ORIGINS=https://你的前端網域
 ```
+
+後台已新增「帳號資料區」，可查看：
+- 目前帳號資料是否使用持久化資料庫
+- 註冊帳號列表
+- 每個帳號的訂閱狀態、文章數、知識庫檔案數與付款筆數
+
+`REQUIRE_PERSISTENT_DATABASE=true` 用於正式環境保護帳號資料。若後端沒有接上 PostgreSQL `DATABASE_URL` 或 Render Persistent Disk，服務會拒絕啟動，避免在不穩定 SQLite 環境中繼續新增帳號。
 
 ### Render 部署建議
 

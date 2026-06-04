@@ -23,5 +23,7 @@ services:
         generateValue: true
       - key: ADMIN_API_KEY
         generateValue: true
+      - key: REQUIRE_PERSISTENT_DATABASE
+        value: true
       - key: CORS_ORIGINS
         sync: false

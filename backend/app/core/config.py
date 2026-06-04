@@ -46,6 +46,7 @@ class AppSettings(BaseSettings):
 
     expose_reset_token_in_response: bool = True
     admin_api_key: str = "change-admin-key-in-production"
+    require_persistent_database: bool = False
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 
     @field_validator("database_url", mode="before")
@@ -60,6 +61,10 @@ class AppSettings(BaseSettings):
         if not self.database_url.startswith("sqlite"):
             return True
         return bool(os.getenv("RENDER_DISK_PATH", "").strip())
+
+    @property
+    def database_backend_label(self) -> str:
+        return "sqlite" if self.database_url.startswith("sqlite") else "server"
 
 
 settings = AppSettings()

@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
-import { AdminRecentPayment, AdminRecentUser, AdminStats } from "@/lib/types";
+import {
+  AdminAccount,
+  AdminAccountStorageStatus,
+  AdminRecentPayment,
+  AdminRecentUser,
+  AdminStats,
+} from "@/lib/types";
 
 const ADMIN_KEY_STORAGE = "admin_api_key";
 
@@ -14,6 +20,8 @@ function money(cents: number, currency = "TWD") {
 export default function AdminPage() {
   const [adminKey, setAdminKey] = useState("");
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [storageStatus, setStorageStatus] = useState<AdminAccountStorageStatus | null>(null);
+  const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [users, setUsers] = useState<AdminRecentUser[]>([]);
   const [payments, setPayments] = useState<AdminRecentPayment[]>([]);
   const [status, setStatus] = useState("請輸入 Admin Key 後載入後台資料");
@@ -37,12 +45,16 @@ export default function AdminPage() {
 
     try {
       localStorage.setItem(ADMIN_KEY_STORAGE, adminKey.trim());
-      const [statsResult, usersResult, paymentsResult] = await Promise.all([
+      const [statsResult, storageResult, accountsResult, usersResult, paymentsResult] = await Promise.all([
         api.getAdminStats(adminKey.trim()),
+        api.getAdminAccountStorageStatus(adminKey.trim()),
+        api.listAdminAccounts(adminKey.trim(), 50),
         api.listAdminRecentUsers(adminKey.trim(), 12),
         api.listAdminRecentPayments(adminKey.trim(), 12),
       ]);
       setStats(statsResult);
+      setStorageStatus(storageResult);
+      setAccounts(accountsResult);
       setUsers(usersResult);
       setPayments(paymentsResult);
       setStatus("載入成功");
@@ -97,6 +109,8 @@ export default function AdminPage() {
               localStorage.removeItem(ADMIN_KEY_STORAGE);
               setAdminKey("");
               setStats(null);
+              setStorageStatus(null);
+              setAccounts([]);
               setUsers([]);
               setPayments([]);
               setStatus("已清除本機 Admin Key");
@@ -117,6 +131,72 @@ export default function AdminPage() {
             <p className="mt-1 text-xl font-bold text-[var(--text)]">{item.value}</p>
           </div>
         ))}
+      </div>
+
+      <div className="card-surface p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-lg font-semibold">帳號資料區</h3>
+          {storageStatus && (
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                storageStatus.account_data_safe
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-rose-200 bg-rose-50 text-rose-700"
+              }`}
+            >
+              {storageStatus.account_data_safe ? "持久化資料庫已啟用" : "帳號資料有遺失風險"}
+            </span>
+          )}
+        </div>
+
+        {storageStatus && (
+          <div className="rounded-xl border border-[var(--line)] bg-white/75 p-4 text-sm text-slate-700">
+            <p>資料庫：{storageStatus.database_backend}</p>
+            <p>帳號資料安全：{storageStatus.account_data_safe ? "是" : "否"}</p>
+            <p>儲存目錄：{storageStatus.storage_dir}</p>
+            {storageStatus.warning && <p className="mt-2 text-rose-700">{storageStatus.warning}</p>}
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-500 border-b border-[var(--line)]">
+                <th className="py-2 pr-3">帳號</th>
+                <th className="py-2 pr-3">訂閱</th>
+                <th className="py-2 pr-3">文章</th>
+                <th className="py-2 pr-3">知識庫</th>
+                <th className="py-2 pr-3">付款</th>
+                <th className="py-2">建立時間</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accounts.map((account) => (
+                <tr key={account.id} className="border-b border-slate-100 text-slate-700">
+                  <td className="py-2 pr-3">
+                    <p className="font-semibold">{account.email}</p>
+                    <p className="text-xs text-slate-500">ID #{account.id}</p>
+                  </td>
+                  <td className="py-2 pr-3">
+                    {account.access_tier} / {account.subscription_status}
+                    {account.expires_at && <p className="text-xs text-slate-500">到期：{new Date(account.expires_at).toLocaleString("zh-TW")}</p>}
+                  </td>
+                  <td className="py-2 pr-3">{account.article_count}</td>
+                  <td className="py-2 pr-3">{account.knowledge_file_count}</td>
+                  <td className="py-2 pr-3">{account.payment_count}</td>
+                  <td className="py-2">{new Date(account.created_at).toLocaleString("zh-TW")}</td>
+                </tr>
+              ))}
+              {accounts.length === 0 && (
+                <tr>
+                  <td className="py-3 text-slate-500" colSpan={6}>
+                    尚無帳號資料
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">

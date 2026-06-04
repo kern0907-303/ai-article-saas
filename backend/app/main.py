@@ -19,6 +19,11 @@ logger = logging.getLogger("uvicorn.error")
 
 app = FastAPI(title=app_settings.app_name)
 
+if app_settings.require_persistent_database and not app_settings.persistent_storage_enabled:
+    raise RuntimeError(
+        "Persistent account database is required. Set DATABASE_URL to PostgreSQL or attach persistent storage before deployment."
+    )
+
 if app_settings.database_url.startswith("sqlite") and not app_settings.persistent_storage_enabled:
     logger.warning(
         "Database is using SQLite without persistent storage. Data may be lost after redeploys or restarts. "

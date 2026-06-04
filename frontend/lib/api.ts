@@ -2,6 +2,8 @@ import { clearToken, getToken } from "@/lib/auth";
 import {
   AdminRecentPayment,
   AdminRecentUser,
+  AdminAccount,
+  AdminAccountStorageStatus,
   AdminStats,
   Article,
   ArticleImage,
@@ -199,6 +201,10 @@ export const api = {
 
   getAdminStats: (adminKey: string) =>
     request<AdminStats>("/admin/stats", { headers: { "X-Admin-Key": adminKey } }),
+  getAdminAccountStorageStatus: (adminKey: string) =>
+    request<AdminAccountStorageStatus>("/admin/account-storage", { headers: { "X-Admin-Key": adminKey } }),
+  listAdminAccounts: (adminKey: string, limit = 50) =>
+    request<AdminAccount[]>(`/admin/accounts?limit=${limit}`, { headers: { "X-Admin-Key": adminKey } }),
   listAdminRecentUsers: (adminKey: string, limit = 10) =>
     request<AdminRecentUser[]>(`/admin/recent-users?limit=${limit}`, { headers: { "X-Admin-Key": adminKey } }),
   listAdminRecentPayments: (adminKey: string, limit = 10) =>

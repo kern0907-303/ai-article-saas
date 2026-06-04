@@ -4,7 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import { api } from "@/lib/api";
-import { Article, ArticleImage, Entitlements, ImageStylePreset, KnowledgeFile } from "@/lib/types";
+import {
+  Article,
+  ArticleImage,
+  Entitlements,
+  GoogleSheetDestination,
+  ImageSizePreset,
+  ImageStylePreset,
+  KnowledgeFile,
+} from "@/lib/types";
 
 const PROMPT_TEMPLATES = [
   {
@@ -39,7 +47,11 @@ export default function ArticlesPage() {
   const [images, setImages] = useState<ArticleImage[]>([]);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [stylePresets, setStylePresets] = useState<ImageStylePreset[]>([]);
+  const [sizePresets, setSizePresets] = useState<ImageSizePreset[]>([]);
+  const [sheetDestinations, setSheetDestinations] = useState<GoogleSheetDestination[]>([]);
   const [selectedImageStyle, setSelectedImageStyle] = useState("blog_cover");
+  const [selectedImageSize, setSelectedImageSize] = useState("instagram_square");
+  const [selectedSheetDestinationId, setSelectedSheetDestinationId] = useState<number | null>(null);
   const [needTextOverlay, setNeedTextOverlay] = useState(true);
   const [imageTextLanguage, setImageTextLanguage] = useState("zh-Hant");
   const [imageTextContent, setImageTextContent] = useState("");
@@ -57,6 +69,7 @@ export default function ArticlesPage() {
   const [loadingArticle, setLoadingArticle] = useState(false);
   const [loadingImages, setLoadingImages] = useState(false);
   const [savingContent, setSavingContent] = useState(false);
+  const [exportingSheet, setExportingSheet] = useState(false);
   const [publishingChannel, setPublishingChannel] = useState<"website" | "social" | null>(null);
   const [pollingArticleId, setPollingArticleId] = useState<number | null>(null);
   const [pollingImageArticleId, setPollingImageArticleId] = useState<number | null>(null);
@@ -67,8 +80,16 @@ export default function ArticlesPage() {
   );
 
   const load = async () => {
-    const [presets, entitlementData] = await Promise.all([api.getImageStylePresets(), api.getEntitlements()]);
+    const [presets, sizes, sheets, entitlementData] = await Promise.all([
+      api.getImageStylePresets(),
+      api.getImageSizePresets(),
+      api.listGoogleSheetDestinations(),
+      api.getEntitlements(),
+    ]);
     setStylePresets(presets);
+    setSizePresets(sizes);
+    setSheetDestinations(sheets);
+    setSelectedSheetDestinationId((prev) => prev || sheets.find((item) => item.is_default)?.id || sheets[0]?.id || null);
     setEntitlements(entitlementData);
 
     if (!entitlementData.is_active) {
@@ -269,6 +290,7 @@ export default function ArticlesPage() {
     try {
       const result = await api.generateArticleImages(currentArticleId, {
         style_preset: selectedImageStyle,
+        output_size: selectedImageSize,
         custom_prompt: prompt,
         need_text_overlay: needTextOverlay,
         text_language: imageTextLanguage,
@@ -316,6 +338,32 @@ export default function ArticlesPage() {
       setStatus(`儲存失敗：${(err as Error).message}`);
     } finally {
       setSavingContent(false);
+    }
+  };
+
+  const exportToGoogleSheets = async () => {
+    if (!currentArticleId) {
+      setStatus("請先生成文章");
+      return;
+    }
+    if (!content.trim()) {
+      setStatus("文章內容為空，無法上傳到 Google Sheets");
+      return;
+    }
+    if (sheetDestinations.length === 0) {
+      setStatus("請先到系統設定新增 Google Sheets 目的地");
+      return;
+    }
+
+    setStatus("上傳 Google Sheets 中...");
+    setExportingSheet(true);
+    try {
+      const result = await api.exportArticleToGoogleSheets(currentArticleId, selectedSheetDestinationId || undefined);
+      setStatus(`${result.message}：${result.destination_label} / ${result.updated_range || result.sheet_name}`);
+    } catch (err) {
+      setStatus(`上傳 Google Sheets 失敗：${(err as Error).message}`);
+    } finally {
+      setExportingSheet(false);
     }
   };
 
@@ -485,7 +533,7 @@ export default function ArticlesPage() {
         <div className="rounded-xl border border-[var(--line)] bg-[linear-gradient(135deg,#fff5d3,#ffdca1)] p-4 space-y-3">
           <p className="text-sm font-semibold text-[var(--text)]">AI 圖片生成（中文文字需求自動走 nano banana）</p>
           <p className="text-xs text-slate-600">系統會自動選最合理路徑：可用時優先走 OpenAI 真實生圖，不可用時自動退回預覽 mock 圖。</p>
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-3 gap-3">
             <label className="block text-sm font-medium">
               圖片風格
               <select
@@ -496,6 +544,21 @@ export default function ArticlesPage() {
                 {stylePresets.map((preset) => (
                   <option key={preset.key} value={preset.key}>
                     {preset.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-medium">
+              社群尺寸
+              <select
+                className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+                value={selectedImageSize}
+                onChange={(e) => setSelectedImageSize(e.target.value)}
+              >
+                {sizePresets.map((preset) => (
+                  <option key={preset.key} value={preset.key}>
+                    {preset.label}（{preset.size}）
                   </option>
                 ))}
               </select>
@@ -564,6 +627,8 @@ export default function ArticlesPage() {
                 )}
                 <p className="text-xs text-slate-600">
                   style: {image.style_preset}
+                  {" / "}
+                  size: {image.width}x{image.height}
                 </p>
                 {image.provider === "nano_banana" && (
                   <p className="text-xs text-slate-500">這張是預覽 mock 圖，用來確認構圖與文案位置。</p>
@@ -575,16 +640,38 @@ export default function ArticlesPage() {
         )}
 
         <div className="flex gap-3 flex-wrap">
+          <label className="block min-w-[240px] text-sm font-medium">
+            Google Sheets 目的地
+            <select
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+              value={selectedSheetDestinationId || ""}
+              onChange={(e) => setSelectedSheetDestinationId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">使用預設目的地</option>
+              {sheetDestinations.map((destination) => (
+                <option key={destination.id} value={destination.id}>
+                  {destination.label} / {destination.sheet_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            onClick={exportToGoogleSheets}
+            className="brand-btn-secondary self-end px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!hasActiveAccess || exportingSheet || sheetDestinations.length === 0}
+          >
+            {exportingSheet ? "上傳中..." : "上傳到 Google Sheets"}
+          </button>
           <button
             onClick={() => publish("website")}
-            className="brand-btn px-4 py-2"
+            className="brand-btn self-end px-4 py-2"
             disabled={!hasActiveAccess || publishingChannel !== null}
           >
             {publishingChannel === "website" ? "發布中..." : "發布至個人網頁"}
           </button>
           <button
             onClick={() => publish("social")}
-            className="brand-btn-secondary px-4 py-2"
+            className="brand-btn-secondary self-end px-4 py-2"
             disabled={!hasActiveAccess || publishingChannel !== null}
           >
             {publishingChannel === "social" ? "發布中..." : "發布至社交平台"}

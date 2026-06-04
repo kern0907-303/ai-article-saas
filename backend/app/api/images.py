@@ -10,6 +10,7 @@ from app.models.settings import Setting
 from app.schemas.image import (
     ArticleImageOut,
     GenerateArticleImagesRequest,
+    ImageSizePresetOut,
     ImageSettingsOut,
     ImageSettingsUpsert,
     ImageStylePresetOut,
@@ -18,7 +19,7 @@ from app.schemas.image import (
 from app.services.audit_service import log_audit
 from app.services.crypto_service import decrypt_text
 from app.services.entitlement_service import consume_feature_usage, require_feature_access
-from app.services.image_service import generate_image_plan, list_style_presets
+from app.services.image_service import generate_image_plan, list_size_presets, list_style_presets
 from app.services.rate_limit_service import check_rate_limit
 from app.utils.deps import get_current_user_id, require_active_subscription
 
@@ -57,6 +58,7 @@ def _generate_images_in_background(
     article_id: int,
     user_id: str,
     style_preset: str,
+    output_size: str | None,
     custom_prompt: str | None,
     need_text_overlay: bool,
     text_language: str,
@@ -87,6 +89,7 @@ def _generate_images_in_background(
             article_topic=article.topic,
             article_outline=article.outline,
             style_preset=style_preset,
+            output_size=output_size,
             custom_prompt=custom_prompt,
             need_text_overlay=need_text_overlay,
             text_language=text_language,
@@ -129,6 +132,11 @@ def _generate_images_in_background(
 @router.get("/image-style-presets", response_model=list[ImageStylePresetOut])
 def get_style_presets():
     return list_style_presets()
+
+
+@router.get("/image-size-presets", response_model=list[ImageSizePresetOut])
+def get_size_presets():
+    return list_size_presets()
 
 
 @router.get("/image-settings", response_model=ImageSettingsOut)
@@ -223,6 +231,7 @@ def generate_article_images(
         article_id=article.id,
         user_id=user_id,
         style_preset=payload.style_preset,
+        output_size=payload.output_size,
         custom_prompt=payload.custom_prompt,
         need_text_overlay=payload.need_text_overlay,
         text_language=payload.text_language,
@@ -256,6 +265,7 @@ def regenerate_article_image(
         article_topic=article.topic,
         article_outline=article.outline,
         style_preset=style_preset,
+        output_size=None,
         custom_prompt=payload.custom_prompt,
         need_text_overlay=payload.need_text_overlay,
         text_language=payload.text_language,

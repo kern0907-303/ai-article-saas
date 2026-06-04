@@ -29,6 +29,49 @@ STYLE_PRESETS: dict[str, dict[str, str]] = {
     },
 }
 
+IMAGE_SIZE_PRESETS: list[dict[str, str | int]] = [
+    {
+        "key": "instagram_square",
+        "label": "Instagram 方形貼文",
+        "description": "適合 IG 貼文、Facebook 方形素材",
+        "size": "1080x1080",
+        "width": 1080,
+        "height": 1080,
+    },
+    {
+        "key": "instagram_story",
+        "label": "Instagram Story / Reels",
+        "description": "適合限時動態、Reels、TikTok 直式素材",
+        "size": "1080x1920",
+        "width": 1080,
+        "height": 1920,
+    },
+    {
+        "key": "facebook_link",
+        "label": "Facebook / LinkedIn 連結圖",
+        "description": "適合橫式連結預覽與商務社群分享",
+        "size": "1200x630",
+        "width": 1200,
+        "height": 630,
+    },
+    {
+        "key": "x_landscape",
+        "label": "X / Twitter 橫式圖",
+        "description": "適合寬版社群貼文與摘要卡片",
+        "size": "1600x900",
+        "width": 1600,
+        "height": 900,
+    },
+    {
+        "key": "blog_cover",
+        "label": "部落格封面",
+        "description": "適合網站文章首圖與一般橫式封面",
+        "size": "1536x1024",
+        "width": 1536,
+        "height": 1024,
+    },
+]
+
 OPENAI_IMAGE_TIMEOUT = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=60.0)
 
 
@@ -38,6 +81,17 @@ def parse_size(size: str) -> tuple[int, int]:
         return int(width), int(height)
     except Exception:
         return 1536, 1024
+
+
+def resolve_size(size: str | None, fallback_size: str) -> str:
+    requested = (size or "").strip()
+    preset = next((item for item in IMAGE_SIZE_PRESETS if item["key"] == requested), None)
+    if preset:
+        return str(preset["size"])
+    if requested:
+        width, height = parse_size(requested)
+        return f"{width}x{height}"
+    return fallback_size
 
 
 def has_cjk(text: str) -> bool:
@@ -276,6 +330,10 @@ def list_style_presets() -> list[dict[str, str]]:
     ]
 
 
+def list_size_presets() -> list[dict[str, str | int]]:
+    return IMAGE_SIZE_PRESETS
+
+
 def build_source_text_for_provider_decision(
     article_topic: str,
     article_outline: str,
@@ -304,8 +362,10 @@ def generate_image_plan(
     num_images: int,
     setting: Any,
     openai_api_key: str | None = None,
+    output_size: str | None = None,
 ) -> list[dict[str, Any]]:
-    width, height = parse_size(setting.default_size)
+    requested_size = resolve_size(output_size, getattr(setting, "default_size", "1080x1080"))
+    width, height = parse_size(requested_size)
     output_format = resolve_output_format(getattr(setting, "output_format", "png"))
     quality = resolve_quality(getattr(setting, "default_quality", "high"))
     source_text = build_source_text_for_provider_decision(
@@ -342,7 +402,7 @@ def generate_image_plan(
             api_key=openai_api_key or "",
             model=model,
             prompt=prompt,
-            size=getattr(setting, "default_size", "1536x1024"),
+            size=requested_size,
             quality=quality,
             output_format=output_format,
             num_images=num_images,

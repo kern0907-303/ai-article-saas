@@ -5,30 +5,30 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
-import { ModelCatalogItem, Settings } from "@/lib/types";
+import { GoogleSheetDestination, ModelCatalogItem, Settings } from "@/lib/types";
 
 const PROVIDER_DEFAULTS: Record<Settings["ai_provider"], { article: string; prompt: string; keyHint: string; keyPlaceholder: string }> = {
   openai: {
-    article: "gpt-4.1-mini",
-    prompt: "gpt-4.1-mini",
+    article: "gpt-5.4-mini",
+    prompt: "gpt-5.4-mini",
     keyHint: "使用 OpenAI 平台發出的 API Key，通常以 sk- 開頭。",
     keyPlaceholder: "sk-...",
   },
   anthropic: {
-    article: "claude-3-5-sonnet-latest",
-    prompt: "claude-3-5-haiku-latest",
+    article: "claude-sonnet-4-6",
+    prompt: "claude-haiku-4-5",
     keyHint: "使用 Anthropic Console 發出的 API Key。",
     keyPlaceholder: "sk-ant-...",
   },
   gemini: {
-    article: "gemini-1.5-pro",
-    prompt: "gemini-1.5-flash",
+    article: "gemini-3.5-flash",
+    prompt: "gemini-3.1-flash-lite",
     keyHint: "使用 Google AI Studio 或 Gemini API 發出的 API Key。",
     keyPlaceholder: "AIza...",
   },
   github: {
-    article: "openai/gpt-4.1",
-    prompt: "openai/gpt-4.1-mini",
+    article: "openai/gpt-5.4",
+    prompt: "openai/gpt-5.4-mini",
     keyHint: "使用 GitHub token，並確認 fine-grained PAT 具備 models: read 權限。",
     keyPlaceholder: "ghp_... / github_pat_...",
   },
@@ -36,26 +36,29 @@ const PROVIDER_DEFAULTS: Record<Settings["ai_provider"], { article: string; prom
 
 const FALLBACK_TEXT_MODELS: Record<Settings["ai_provider"], ModelCatalogItem[]> = {
   openai: [
-    { key: "gpt-4.1-mini", provider: "openai", category: "text", label: "GPT-4.1 Mini", description: "", cost_tier: "low" },
-    { key: "gpt-4.1", provider: "openai", category: "text", label: "GPT-4.1", description: "", cost_tier: "high" },
+    { key: "gpt-5.4-mini", provider: "openai", category: "text", label: "GPT-5.4 Mini", description: "", cost_tier: "low" },
+    { key: "gpt-5.4", provider: "openai", category: "text", label: "GPT-5.4", description: "", cost_tier: "high" },
+    { key: "gpt-5.5", provider: "openai", category: "text", label: "GPT-5.5", description: "", cost_tier: "high" },
   ],
   anthropic: [
-    { key: "claude-3-5-haiku-latest", provider: "anthropic", category: "text", label: "Claude 3.5 Haiku", description: "", cost_tier: "low" },
-    { key: "claude-3-5-sonnet-latest", provider: "anthropic", category: "text", label: "Claude 3.5 Sonnet", description: "", cost_tier: "medium" },
+    { key: "claude-haiku-4-5", provider: "anthropic", category: "text", label: "Claude Haiku 4.5", description: "", cost_tier: "low" },
+    { key: "claude-sonnet-4-6", provider: "anthropic", category: "text", label: "Claude Sonnet 4.6", description: "", cost_tier: "medium" },
+    { key: "claude-opus-4-8", provider: "anthropic", category: "text", label: "Claude Opus 4.8", description: "", cost_tier: "high" },
   ],
   gemini: [
-    { key: "gemini-1.5-flash", provider: "gemini", category: "text", label: "Gemini 1.5 Flash", description: "", cost_tier: "low" },
-    { key: "gemini-1.5-pro", provider: "gemini", category: "text", label: "Gemini 1.5 Pro", description: "", cost_tier: "high" },
+    { key: "gemini-3.1-flash-lite", provider: "gemini", category: "text", label: "Gemini 3.1 Flash-Lite", description: "", cost_tier: "low" },
+    { key: "gemini-3.5-flash", provider: "gemini", category: "text", label: "Gemini 3.5 Flash", description: "", cost_tier: "low" },
+    { key: "gemini-3.1-pro", provider: "gemini", category: "text", label: "Gemini 3.1 Pro", description: "", cost_tier: "high" },
   ],
   github: [
-    { key: "openai/gpt-4.1-mini", provider: "github", category: "text", label: "GitHub Models: GPT-4.1 Mini", description: "", cost_tier: "low" },
-    { key: "openai/gpt-4.1", provider: "github", category: "text", label: "GitHub Models: GPT-4.1", description: "", cost_tier: "high" },
+    { key: "openai/gpt-5.4-mini", provider: "github", category: "text", label: "GitHub Models: GPT-5.4 Mini", description: "", cost_tier: "low" },
+    { key: "openai/gpt-5.4", provider: "github", category: "text", label: "GitHub Models: GPT-5.4", description: "", cost_tier: "high" },
   ],
 };
 
 const FALLBACK_IMAGE_MODELS: ModelCatalogItem[] = [
-  { key: "gpt-image-1", provider: "openai", category: "image", label: "GPT Image 1", description: "", cost_tier: "medium" },
-  { key: "nano-banana-v1", provider: "nano_banana", category: "image", label: "Nano Banana v1", description: "", cost_tier: "medium" },
+  { key: "gpt-image-2", provider: "openai", category: "image", label: "GPT Image 2", description: "", cost_tier: "medium" },
+  { key: "nano-banana-pro", provider: "nano_banana", category: "image", label: "Nano Banana Pro", description: "", cost_tier: "medium" },
 ];
 
 function getActiveProviderKey(form: {
@@ -101,15 +104,25 @@ export default function SettingsPage() {
     github_api_key: "",
     website_api_key: "",
     social_api_key: "",
-    article_model: "gpt-4.1-mini",
-    prompt_model: "gpt-4.1-mini",
-    image_model: "gpt-image-1",
+    article_model: "gpt-5.4-mini",
+    prompt_model: "gpt-5.4-mini",
+    image_model: "gpt-image-2",
     website_endpoint: "",
     social_endpoint: "",
     notes: "",
   });
   const [modelCatalog, setModelCatalog] = useState<ModelCatalogItem[]>([]);
+  const [sheetDestinations, setSheetDestinations] = useState<GoogleSheetDestination[]>([]);
+  const [sheetForm, setSheetForm] = useState({
+    id: null as number | null,
+    label: "",
+    spreadsheet_id: "",
+    sheet_name: "文章準備",
+    service_account_json: "",
+    is_default: false,
+  });
   const [status, setStatus] = useState("");
+  const [sheetStatus, setSheetStatus] = useState("");
   const [showAdvancedPublish, setShowAdvancedPublish] = useState(false);
 
   useEffect(() => {
@@ -127,9 +140,9 @@ export default function SettingsPage() {
           github_api_key: settingsData.github_api_key || "",
           website_api_key: settingsData.website_api_key || "",
           social_api_key: settingsData.social_api_key || "",
-          article_model: settingsData.article_model || "gpt-4.1-mini",
-          prompt_model: settingsData.prompt_model || "gpt-4.1-mini",
-          image_model: settingsData.image_model || "gpt-image-1",
+          article_model: settingsData.article_model || "gpt-5.4-mini",
+          prompt_model: settingsData.prompt_model || "gpt-5.4-mini",
+          image_model: settingsData.image_model || "gpt-image-2",
           website_endpoint: settingsData.website_endpoint || "",
           social_endpoint: settingsData.social_endpoint || "",
           notes: settingsData.notes || "",
@@ -149,6 +162,17 @@ export default function SettingsPage() {
       .catch((err: Error) => {
         if (!mounted) return;
         setStatus((prev) => prev || `模型清單讀取失敗，已先使用預設值：${err.message}`);
+      });
+
+    api
+      .listGoogleSheetDestinations()
+      .then((items) => {
+        if (!mounted) return;
+        setSheetDestinations(items);
+      })
+      .catch((err: Error) => {
+        if (!mounted) return;
+        setSheetStatus(`Google Sheets 目的地讀取失敗：${err.message}`);
       });
 
     return () => {
@@ -195,6 +219,80 @@ export default function SettingsPage() {
       setStatus("儲存成功，現在可前往「文章創作與發布」測試。 ");
     } catch (err) {
       setStatus(`儲存失敗：${(err as Error).message}`);
+    }
+  };
+
+  const resetSheetForm = () => {
+    setSheetForm({
+      id: null,
+      label: "",
+      spreadsheet_id: "",
+      sheet_name: "文章準備",
+      service_account_json: "",
+      is_default: false,
+    });
+  };
+
+  const refreshSheetDestinations = async () => {
+    const items = await api.listGoogleSheetDestinations();
+    setSheetDestinations(items);
+  };
+
+  const saveSheetDestination = async () => {
+    if (!sheetForm.label.trim() || !sheetForm.spreadsheet_id.trim() || !sheetForm.sheet_name.trim()) {
+      setSheetStatus("請填入目的地名稱、Spreadsheet ID 與工作表名稱");
+      return;
+    }
+    if (!sheetForm.id && !sheetForm.service_account_json.trim()) {
+      setSheetStatus("新增目的地時必須貼上 Service Account JSON");
+      return;
+    }
+
+    setSheetStatus("Google Sheets 目的地儲存中...");
+    try {
+      const payload = {
+        label: sheetForm.label.trim(),
+        spreadsheet_id: sheetForm.spreadsheet_id.trim(),
+        sheet_name: sheetForm.sheet_name.trim(),
+        service_account_json: sheetForm.service_account_json.trim() || undefined,
+        is_default: sheetForm.is_default,
+      };
+      if (sheetForm.id) {
+        await api.updateGoogleSheetDestination(sheetForm.id, payload);
+      } else {
+        await api.createGoogleSheetDestination({ ...payload, service_account_json: sheetForm.service_account_json.trim() });
+      }
+      await refreshSheetDestinations();
+      resetSheetForm();
+      setSheetStatus("Google Sheets 目的地已儲存");
+    } catch (err) {
+      setSheetStatus(`Google Sheets 目的地儲存失敗：${(err as Error).message}`);
+    }
+  };
+
+  const editSheetDestination = (destination: GoogleSheetDestination) => {
+    setSheetForm({
+      id: destination.id,
+      label: destination.label,
+      spreadsheet_id: destination.spreadsheet_id,
+      sheet_name: destination.sheet_name,
+      service_account_json: "",
+      is_default: destination.is_default,
+    });
+    setSheetStatus("正在編輯目的地。若不更換 Service Account，JSON 欄位可留空。");
+  };
+
+  const deleteSheetDestination = async (destination: GoogleSheetDestination) => {
+    const ok = window.confirm(`確定要刪除「${destination.label}」嗎？`);
+    if (!ok) return;
+    setSheetStatus("刪除 Google Sheets 目的地中...");
+    try {
+      await api.deleteGoogleSheetDestination(destination.id);
+      await refreshSheetDestinations();
+      if (sheetForm.id === destination.id) resetSheetForm();
+      setSheetStatus("Google Sheets 目的地已刪除");
+    } catch (err) {
+      setSheetStatus(`刪除失敗：${(err as Error).message}`);
     }
   };
 
@@ -321,6 +419,83 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </div>
+
+        <div className="rounded-xl border border-[var(--line)] bg-[rgba(255,248,231,0.82)] p-4 space-y-4">
+          <div>
+            <h3 className="font-semibold text-[var(--text)]">Google Sheets 上傳目的地</h3>
+            <p className="mt-1 text-xs text-slate-600">可建立多個 Spreadsheet ID，對應不同客戶、品牌帳號或內容準備頁。</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-3">
+            <InputSimple label="目的地名稱" value={sheetForm.label} onChange={(v) => setSheetForm({ ...sheetForm, label: v })} />
+            <InputSimple
+              label="Spreadsheet ID"
+              value={sheetForm.spreadsheet_id}
+              onChange={(v) => setSheetForm({ ...sheetForm, spreadsheet_id: v })}
+            />
+            <InputSimple label="工作表名稱" value={sheetForm.sheet_name} onChange={(v) => setSheetForm({ ...sheetForm, sheet_name: v })} />
+            <label className="flex items-center gap-2 pt-6 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={sheetForm.is_default}
+                onChange={(e) => setSheetForm({ ...sheetForm, is_default: e.target.checked })}
+              />
+              設為預設上傳目的地
+            </label>
+          </div>
+
+          <label className="block text-sm font-medium text-slate-700">
+            Service Account JSON
+            <textarea
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2 font-mono text-xs"
+              rows={5}
+              value={sheetForm.service_account_json}
+              onChange={(e) => setSheetForm({ ...sheetForm, service_account_json: e.target.value })}
+              placeholder={sheetForm.id ? "不更換 Service Account 時可留空" : "{\"client_email\":\"...\",\"private_key\":\"...\"}"}
+            />
+          </label>
+
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" className="brand-btn-secondary px-4 py-2" onClick={saveSheetDestination}>
+              {sheetForm.id ? "更新目的地" : "新增目的地"}
+            </button>
+            {sheetForm.id && (
+              <button type="button" className="rounded-lg border border-[var(--line)] bg-white/75 px-4 py-2 text-sm" onClick={resetSheetForm}>
+                取消編輯
+              </button>
+            )}
+          </div>
+
+          {sheetDestinations.length > 0 && (
+            <div className="space-y-2">
+              {sheetDestinations.map((destination) => (
+                <div key={destination.id} className="rounded-xl border border-[var(--line)] bg-white/80 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-800">
+                        {destination.label} {destination.is_default ? "（預設）" : ""}
+                      </p>
+                      <p className="mt-1 break-all text-xs text-slate-600">Spreadsheet ID：{destination.spreadsheet_id}</p>
+                      <p className="text-xs text-slate-600">
+                        工作表：{destination.sheet_name} / Service Account：{destination.service_account_email}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button type="button" className="brand-btn-secondary px-3 py-2 text-sm" onClick={() => editSheetDestination(destination)}>
+                        編輯
+                      </button>
+                      <button type="button" className="brand-btn-danger px-3 py-2 text-sm" onClick={() => deleteSheetDestination(destination)}>
+                        刪除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {sheetStatus && <p className="text-sm text-slate-600">{sheetStatus}</p>}
         </div>
 
         <div className="rounded-xl border border-[var(--line)] bg-[rgba(255,248,231,0.82)] p-4 space-y-3">

@@ -32,9 +32,9 @@ def run_startup_migrations(engine: Engine) -> None:
         _add_column_if_missing(engine, "settings", "github_api_key_encrypted TEXT", "github_api_key_encrypted")
         _add_column_if_missing(engine, "settings", "website_api_key_encrypted TEXT", "website_api_key_encrypted")
         _add_column_if_missing(engine, "settings", "social_api_key_encrypted TEXT", "social_api_key_encrypted")
-        _add_column_if_missing(engine, "settings", "article_model VARCHAR(100) DEFAULT 'gpt-4.1-mini'", "article_model")
-        _add_column_if_missing(engine, "settings", "prompt_model VARCHAR(100) DEFAULT 'gpt-4.1-mini'", "prompt_model")
-        _add_column_if_missing(engine, "settings", "image_model VARCHAR(100) DEFAULT 'gpt-image-1'", "image_model")
+        _add_column_if_missing(engine, "settings", "article_model VARCHAR(100) DEFAULT 'gpt-5.4-mini'", "article_model")
+        _add_column_if_missing(engine, "settings", "prompt_model VARCHAR(100) DEFAULT 'gpt-5.4-mini'", "prompt_model")
+        _add_column_if_missing(engine, "settings", "image_model VARCHAR(100) DEFAULT 'gpt-image-2'", "image_model")
 
     if _table_exists(engine, "articles"):
         _add_column_if_missing(engine, "articles", "generation_error TEXT", "generation_error")

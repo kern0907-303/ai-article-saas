@@ -27,9 +27,9 @@ class Setting(BaseModel):
     website_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     social_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    article_model: Mapped[str] = mapped_column(String(100), default="gpt-4.1-mini")
-    prompt_model: Mapped[str] = mapped_column(String(100), default="gpt-4.1-mini")
-    image_model: Mapped[str] = mapped_column(String(100), default="gpt-image-1")
+    article_model: Mapped[str] = mapped_column(String(100), default="gpt-5.4-mini")
+    prompt_model: Mapped[str] = mapped_column(String(100), default="gpt-5.4-mini")
+    image_model: Mapped[str] = mapped_column(String(100), default="gpt-image-2")
 
     website_endpoint: Mapped[str | None] = mapped_column(String(500), nullable=True)
     social_endpoint: Mapped[str | None] = mapped_column(String(500), nullable=True)

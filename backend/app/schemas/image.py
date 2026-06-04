@@ -7,9 +7,9 @@ class ImageSettingsBase(BaseModel):
     image_provider_mode: str = Field(default="auto")
     default_provider: str = Field(default="openai")
     force_nano_banana_for_zh_text: bool = True
-    nano_banana_model: str = "nano-banana-v1"
-    openai_image_model: str = "gpt-image-1"
-    default_size: str = "1536x1024"
+    nano_banana_model: str = "nano-banana-pro"
+    openai_image_model: str = "gpt-image-2"
+    default_size: str = "1080x1080"
     default_quality: str = "high"
     output_format: str = "png"
     images_per_article: int = Field(default=1, ge=1, le=5)
@@ -35,6 +35,15 @@ class ImageStylePresetOut(BaseModel):
     description: str
 
 
+class ImageSizePresetOut(BaseModel):
+    key: str
+    label: str
+    description: str
+    size: str
+    width: int
+    height: int
+
+
 class ArticleImageOut(BaseModel):
     id: int
     user_id: str
@@ -58,6 +67,7 @@ class ArticleImageOut(BaseModel):
 
 class GenerateArticleImagesRequest(BaseModel):
     style_preset: str = "blog_cover"
+    output_size: str | None = None
     custom_prompt: str | None = None
     need_text_overlay: bool = False
     text_language: str = "none"

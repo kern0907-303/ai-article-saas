@@ -12,9 +12,9 @@ class SettingsBase(BaseModel):
     website_api_key: str | None = None
     social_api_key: str | None = None
 
-    article_model: str = "gpt-4.1-mini"
-    prompt_model: str = "gpt-4.1-mini"
-    image_model: str = "gpt-image-1"
+    article_model: str = "gpt-5.4-mini"
+    prompt_model: str = "gpt-5.4-mini"
+    image_model: str = "gpt-image-2"
 
     website_endpoint: str | None = None
     social_endpoint: str | None = None

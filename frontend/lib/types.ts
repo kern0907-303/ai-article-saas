@@ -72,7 +72,7 @@ export type ImageSettings = {
   nano_banana_model: string;
   openai_image_model: string;
   default_size: string;
-  default_quality: "standard" | "high";
+  default_quality: "standard" | "high" | "auto";
   output_format: "png" | "jpg" | "webp";
   images_per_article: number;
   zh_text_detection_keywords: string;
@@ -82,6 +82,15 @@ export type ImageStylePreset = {
   key: string;
   label: string;
   description: string;
+};
+
+export type ImageSizePreset = {
+  key: string;
+  label: string;
+  description: string;
+  size: string;
+  width: number;
+  height: number;
 };
 
 export type ArticleImage = {
@@ -190,4 +199,36 @@ export type AdminRecentPayment = {
   provider: string;
   status: string;
   created_at: string;
+};
+
+export type GoogleSheetDestination = {
+  id: number;
+  user_id: string;
+  label: string;
+  spreadsheet_id: string;
+  sheet_name: string;
+  service_account_email: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GoogleSheetDestinationPayload = {
+  label: string;
+  spreadsheet_id: string;
+  sheet_name: string;
+  service_account_json?: string;
+  is_default: boolean;
+};
+
+export type GoogleSheetExportResponse = {
+  success: boolean;
+  article_id: number;
+  destination_id: number;
+  destination_label: string;
+  spreadsheet_id: string;
+  sheet_name: string;
+  updated_range: string;
+  updated_rows: number;
+  message: string;
 };

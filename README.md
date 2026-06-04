@@ -8,6 +8,8 @@
 - 系統設定（API Keys）
 - 個人知識庫（上傳參考檔）
 - AI 文章生成
+- AI 配圖（依常見社群平台尺寸輸出）
+- 寫好的文章上傳至多個 Google Sheets 目的地
 - 模擬自動發布至個人網頁/社交平台
 
 ## 專案結構
@@ -131,6 +133,15 @@ Base URL：`http://localhost:8000/api`
 
 目前先回傳模擬成功訊息，並更新文章發布狀態欄位。
 
+### 5) Google Sheets 準備表
+- `GET /google-sheets/destinations`：列出目前使用者的 Google Sheets 目的地
+- `POST /google-sheets/destinations`：新增目的地（目的地名稱、Spreadsheet ID、工作表名稱、Service Account JSON）
+- `PUT /google-sheets/destinations/{destination_id}`：更新目的地
+- `DELETE /google-sheets/destinations/{destination_id}`：刪除目的地
+- `POST /articles/{article_id}/export/google-sheets`：把目前文章追加到指定或預設 Google Sheet
+
+每個使用者可建立多個目的地，用來對應不同客戶、品牌帳號或內容準備頁。Service Account JSON 會加密後存入資料庫。請到 Google Cloud 建立 Service Account，啟用 Google Sheets API，並把目標試算表分享給該 Service Account 的 `client_email`，至少授予編輯權限。
+
 ## Phase 3：前端 UI（Next.js）
 
 具備側邊欄導覽：
@@ -141,7 +152,13 @@ Base URL：`http://localhost:8000/api`
 `文章創作與發布` 頁面包含三區塊：
 1. 選擇參考檔案、輸入主題與大綱、點擊「生成文章」
 2. 大型文字編輯區，可手動修改並儲存
-3. 發布按鈕（個人網頁 / 社交平台）與狀態顯示
+3. 發布按鈕（Google Sheets / 個人網頁 / 社交平台）、AI 配圖尺寸選項與狀態顯示
+
+目前模型選項已更新：
+- OpenAI：GPT-5.5、GPT-5.4、GPT-5.4 mini/nano，圖片預設 GPT Image 2
+- Anthropic：Claude Opus 4.8、Claude Sonnet 4.6、Claude Haiku 4.5
+- Gemini：Gemini 3.5 Flash、Gemini 3.1 Pro、Gemini 3.1 Flash-Lite
+- 圖片尺寸：Instagram 方形、Instagram Story/Reels、Facebook/LinkedIn 連結圖、X/Twitter 橫式圖、部落格封面
 
 ## 本機啟動方式（穩定模式）
 

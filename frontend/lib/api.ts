@@ -8,7 +8,11 @@ import {
   AuthResponse,
   CheckoutResponse,
   Entitlements,
+  GoogleSheetDestination,
+  GoogleSheetDestinationPayload,
+  GoogleSheetExportResponse,
   ImageSettings,
+  ImageSizePreset,
   ImageStylePreset,
   KnowledgeFile,
   ModelCatalogItem,
@@ -118,6 +122,15 @@ export const api = {
   saveImageSettings: (payload: Partial<ImageSettings>) =>
     request<ImageSettings>("/image-settings", { method: "PUT", body: JSON.stringify(payload) }),
   getImageStylePresets: () => request<ImageStylePreset[]>("/image-style-presets"),
+  getImageSizePresets: () => request<ImageSizePreset[]>("/image-size-presets"),
+
+  listGoogleSheetDestinations: () => request<GoogleSheetDestination[]>("/google-sheets/destinations"),
+  createGoogleSheetDestination: (payload: GoogleSheetDestinationPayload & { service_account_json: string }) =>
+    request<GoogleSheetDestination>("/google-sheets/destinations", { method: "POST", body: JSON.stringify(payload) }),
+  updateGoogleSheetDestination: (id: number, payload: GoogleSheetDestinationPayload) =>
+    request<GoogleSheetDestination>(`/google-sheets/destinations/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  deleteGoogleSheetDestination: (id: number) =>
+    request<{ success: boolean; message: string; destination_id: number }>(`/google-sheets/destinations/${id}`, { method: "DELETE" }),
 
   listPlans: () => request<Plan[]>("/billing/plans"),
   getSubscription: () => request<Subscription>("/billing/subscription"),
@@ -166,6 +179,7 @@ export const api = {
     articleId: number,
     payload: {
       style_preset: string;
+      output_size?: string;
       custom_prompt?: string;
       need_text_overlay?: boolean;
       text_language?: string;
@@ -174,6 +188,11 @@ export const api = {
     },
   ) => request<ArticleImage[]>(`/articles/${articleId}/generate-images`, { method: "POST", body: JSON.stringify(payload) }),
   listArticleImages: (articleId: number) => request<ArticleImage[]>(`/articles/${articleId}/images`),
+  exportArticleToGoogleSheets: (articleId: number, destinationId?: number) =>
+    request<GoogleSheetExportResponse>(`/articles/${articleId}/export/google-sheets`, {
+      method: "POST",
+      body: JSON.stringify({ destination_id: destinationId || null }),
+    }),
 
   publishWebsite: (id: number) => request<{ message: string }>(`/publish/website/${id}`, { method: "POST" }),
   publishSocial: (id: number) => request<{ message: string }>(`/publish/social/${id}`, { method: "POST" }),

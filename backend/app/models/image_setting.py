@@ -16,7 +16,7 @@ class ImageSetting(BaseModel):
     force_nano_banana_for_zh_text: Mapped[bool] = mapped_column(Boolean, default=True)
 
     nano_banana_model: Mapped[str] = mapped_column(String(100), default="nano-banana-pro")
-    openai_image_model: Mapped[str] = mapped_column(String(100), default="gpt-image-2")
+    openai_image_model: Mapped[str] = mapped_column(String(100), default="gpt-image-1.5")
 
     default_size: Mapped[str] = mapped_column(String(32), default="1080x1080")
     default_quality: Mapped[str] = mapped_column(String(32), default="high")

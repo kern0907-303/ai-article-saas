@@ -284,6 +284,34 @@ def _data_url_from_base64(output_format: str, image_base64: str) -> str:
     return f"data:{mime};base64,{image_base64}"
 
 
+def is_gpt_image_model(model: str) -> bool:
+    normalized = (model or "").strip().lower()
+    return normalized.startswith("gpt-image-") or normalized == "chatgpt-image-latest"
+
+
+def build_openai_image_generate_params(
+    *,
+    model: str,
+    prompt: str,
+    size: str,
+    quality: str,
+    output_format: str,
+    num_images: int,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {
+        "model": model,
+        "prompt": prompt,
+        "n": num_images,
+        "size": size,
+        "quality": quality,
+    }
+    if is_gpt_image_model(model):
+        params["output_format"] = output_format
+    else:
+        params["response_format"] = "b64_json"
+    return params
+
+
 def _generate_openai_images(
     *,
     api_key: str,
@@ -295,15 +323,14 @@ def _generate_openai_images(
     num_images: int,
 ) -> list[str]:
     client = OpenAI(api_key=api_key, timeout=OPENAI_IMAGE_TIMEOUT)
-    response = client.images.generate(
+    response = client.images.generate(**build_openai_image_generate_params(
         model=model,
         prompt=prompt,
-        n=num_images,
         size=size,
         quality=quality,
         output_format=output_format,
-        response_format="b64_json",
-    )
+        num_images=num_images,
+    ))
     data = response.data or []
     if not data:
         raise RuntimeError("OpenAI Images 未回傳圖片資料")

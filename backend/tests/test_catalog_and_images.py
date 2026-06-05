@@ -1,6 +1,7 @@
 from app.api.settings import MODEL_CATALOG
 from app.services.image_service import (
     IMAGE_SIZE_PRESETS,
+    build_openai_image_generate_params,
     parse_size,
     resolve_output_format,
     resolve_quality,
@@ -16,7 +17,8 @@ def test_model_catalog_uses_current_text_and_image_models():
     assert "claude-opus-4-8" in keys
     assert "gemini-3.5-flash" in keys
     assert "gemini-3.1-pro" in keys
-    assert "gpt-image-2" in keys
+    assert "gpt-image-1.5" in keys
+    assert "gpt-image-1" in keys
     assert "nano-banana-pro" in keys
 
 
@@ -37,6 +39,20 @@ def test_social_image_size_presets_are_named_for_platforms():
     assert parse_size(sizes["facebook_link"]) == (1200, 630)
 
 
-def test_openai_image_2_accepts_auto_quality_and_webp_format():
+def test_openai_image_accepts_auto_quality_and_webp_format():
     assert resolve_quality("auto") == "auto"
     assert resolve_output_format("webp") == "webp"
+
+
+def test_gpt_image_generation_params_do_not_send_response_format():
+    params = build_openai_image_generate_params(
+        model="gpt-image-1.5",
+        prompt="cover image",
+        size="1536x1024",
+        quality="high",
+        output_format="png",
+        num_images=1,
+    )
+
+    assert params["output_format"] == "png"
+    assert "response_format" not in params

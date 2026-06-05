@@ -172,11 +172,19 @@ MODEL_CATALOG: list[ModelCatalogItem] = [
         cost_tier="low",
     ),
     ModelCatalogItem(
-        key="gpt-image-2",
+        key="gpt-image-1.5",
         provider="openai",
         category="image",
-        label="GPT Image 2",
-        description="OpenAI 最新通用圖片生成模型",
+        label="GPT Image 1.5",
+        description="OpenAI 最新 GPT Image 模型，支援社群與文章封面生成",
+        cost_tier="medium",
+    ),
+    ModelCatalogItem(
+        key="gpt-image-1",
+        provider="openai",
+        category="image",
+        label="GPT Image 1",
+        description="OpenAI 穩定通用圖片生成模型",
         cost_tier="medium",
     ),
     ModelCatalogItem(

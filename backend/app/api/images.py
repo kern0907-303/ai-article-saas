@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings as app_settings
 from app.core.database import SessionLocal, get_db
 from app.models.article import Article
 from app.models.article_image import ArticleImage
@@ -20,6 +21,7 @@ from app.services.audit_service import log_audit
 from app.services.crypto_service import decrypt_text
 from app.services.entitlement_service import consume_feature_usage, require_feature_access
 from app.services.image_service import generate_image_plan, list_size_presets, list_style_presets
+from app.services.pcloud_service import PCloudConfig, upload_data_url_to_pcloud
 from app.services.rate_limit_service import check_rate_limit
 from app.utils.deps import get_current_user_id, require_active_subscription
 
@@ -50,6 +52,29 @@ def _get_openai_image_api_key(db: Session, user_id: str) -> str | None:
     if not setting:
         return None
     return decrypt_text(setting.openai_api_key_encrypted) or setting.openai_api_key
+
+
+def _get_pcloud_config() -> PCloudConfig:
+    return PCloudConfig(
+        auth_token=app_settings.pcloud_auth_token,
+        api_host=app_settings.pcloud_api_host,
+        folder_id=app_settings.pcloud_folder_id,
+        folder_path=app_settings.pcloud_folder_path,
+        create_public_link=app_settings.pcloud_create_public_link,
+        use_direct_download_link=app_settings.pcloud_use_direct_download_link,
+    )
+
+
+def _persist_image_url(image_url: str, *, article_id: int, image_id: int) -> str:
+    pcloud_config = _get_pcloud_config()
+    if pcloud_config.enabled and image_url.startswith("data:image/"):
+        return upload_data_url_to_pcloud(
+            pcloud_config,
+            data_url=image_url,
+            article_id=article_id,
+            image_id=image_id,
+        )
+    return image_url
 
 
 def _generate_images_in_background(
@@ -103,7 +128,7 @@ def _generate_images_in_background(
             record.provider = plan["provider"]
             record.model = plan["model"]
             record.prompt = plan["prompt"]
-            record.image_url = plan["image_url"]
+            record.image_url = _persist_image_url(plan["image_url"], article_id=article_id, image_id=record.id)
             record.width = plan["width"]
             record.height = plan["height"]
             record.text_language = plan["text_language"]
@@ -280,7 +305,7 @@ def regenerate_article_image(
     record.model = plan["model"]
     record.style_preset = style_preset
     record.prompt = plan["prompt"]
-    record.image_url = plan["image_url"]
+    record.image_url = _persist_image_url(plan["image_url"], article_id=article.id, image_id=record.id)
     record.width = plan["width"]
     record.height = plan["height"]
     record.text_language = plan["text_language"]

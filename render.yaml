@@ -29,3 +29,15 @@ services:
         value: true
       - key: CORS_ORIGINS
         sync: false
+      - key: PCLOUD_AUTH_TOKEN
+        sync: false
+      - key: PCLOUD_API_HOST
+        value: api.pcloud.com
+      - key: PCLOUD_FOLDER_ID
+        sync: false
+      - key: PCLOUD_FOLDER_PATH
+        sync: false
+      - key: PCLOUD_CREATE_PUBLIC_LINK
+        value: true
+      - key: PCLOUD_USE_DIRECT_DOWNLOAD_LINK
+        value: true

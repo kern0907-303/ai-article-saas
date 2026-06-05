@@ -16,7 +16,7 @@ class ArticleImage(BaseModel):
     style_preset: Mapped[str] = mapped_column(String(50), default="blog_cover")
 
     prompt: Mapped[str] = mapped_column(Text)
-    image_url: Mapped[str] = mapped_column(String(500))
+    image_url: Mapped[str] = mapped_column(Text)
     width: Mapped[int] = mapped_column(Integer, default=1536)
     height: Mapped[int] = mapped_column(Integer, default=1024)
 

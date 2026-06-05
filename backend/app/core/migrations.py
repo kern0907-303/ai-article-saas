@@ -34,13 +34,19 @@ def run_startup_migrations(engine: Engine) -> None:
         _add_column_if_missing(engine, "settings", "social_api_key_encrypted TEXT", "social_api_key_encrypted")
         _add_column_if_missing(engine, "settings", "article_model VARCHAR(100) DEFAULT 'gpt-5.4-mini'", "article_model")
         _add_column_if_missing(engine, "settings", "prompt_model VARCHAR(100) DEFAULT 'gpt-5.4-mini'", "prompt_model")
-        _add_column_if_missing(engine, "settings", "image_model VARCHAR(100) DEFAULT 'gpt-image-2'", "image_model")
+        _add_column_if_missing(engine, "settings", "image_model VARCHAR(100) DEFAULT 'gpt-image-1.5'", "image_model")
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE settings SET image_model='gpt-image-1.5' WHERE image_model='gpt-image-2'"))
 
     if _table_exists(engine, "articles"):
         _add_column_if_missing(engine, "articles", "generation_error TEXT", "generation_error")
 
     if _table_exists(engine, "article_images"):
         _add_column_if_missing(engine, "article_images", "generation_error TEXT", "generation_error")
+
+    if _table_exists(engine, "image_settings"):
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE image_settings SET openai_image_model='gpt-image-1.5' WHERE openai_image_model='gpt-image-2'"))
 
     if _table_exists(engine, "knowledge_files"):
         _add_column_if_missing(

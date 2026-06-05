@@ -48,6 +48,13 @@ class AppSettings(BaseSettings):
     auth_enabled: bool = False
     admin_api_key: str = "change-admin-key-in-production"
     require_persistent_database: bool = False
+
+    pcloud_auth_token: str | None = None
+    pcloud_api_host: str = "api.pcloud.com"
+    pcloud_folder_id: int | None = None
+    pcloud_folder_path: str | None = None
+    pcloud_create_public_link: bool = True
+    pcloud_use_direct_download_link: bool = True
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 
     @field_validator("database_url", mode="before")

@@ -14,7 +14,7 @@ class SettingsBase(BaseModel):
 
     article_model: str = "gpt-5.4-mini"
     prompt_model: str = "gpt-5.4-mini"
-    image_model: str = "gpt-image-2"
+    image_model: str = "gpt-image-1.5"
 
     website_endpoint: str | None = None
     social_endpoint: str | None = None

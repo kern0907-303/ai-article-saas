@@ -57,7 +57,8 @@ const FALLBACK_TEXT_MODELS: Record<Settings["ai_provider"], ModelCatalogItem[]> 
 };
 
 const FALLBACK_IMAGE_MODELS: ModelCatalogItem[] = [
-  { key: "gpt-image-2", provider: "openai", category: "image", label: "GPT Image 2", description: "", cost_tier: "medium" },
+  { key: "gpt-image-1.5", provider: "openai", category: "image", label: "GPT Image 1.5", description: "", cost_tier: "medium" },
+  { key: "gpt-image-1", provider: "openai", category: "image", label: "GPT Image 1", description: "", cost_tier: "medium" },
   { key: "nano-banana-pro", provider: "nano_banana", category: "image", label: "Nano Banana Pro", description: "", cost_tier: "medium" },
 ];
 
@@ -106,7 +107,7 @@ export default function SettingsPage() {
     social_api_key: "",
     article_model: "gpt-5.4-mini",
     prompt_model: "gpt-5.4-mini",
-    image_model: "gpt-image-2",
+    image_model: "gpt-image-1.5",
     website_endpoint: "",
     social_endpoint: "",
     notes: "",
@@ -142,7 +143,7 @@ export default function SettingsPage() {
           social_api_key: settingsData.social_api_key || "",
           article_model: settingsData.article_model || "gpt-5.4-mini",
           prompt_model: settingsData.prompt_model || "gpt-5.4-mini",
-          image_model: settingsData.image_model || "gpt-image-2",
+          image_model: settingsData.image_model || "gpt-image-1.5",
           website_endpoint: settingsData.website_endpoint || "",
           social_endpoint: settingsData.social_endpoint || "",
           notes: settingsData.notes || "",

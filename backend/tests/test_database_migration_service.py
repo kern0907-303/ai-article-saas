@@ -31,7 +31,7 @@ def create_source_database(path):
                 openai_api_key_encrypted="encrypted-openai-key",
                 article_model="gpt-5.4-mini",
                 prompt_model="gpt-5.4-mini",
-                image_model="gpt-image-2",
+                image_model="gpt-image-1.5",
             )
         )
         db.add(

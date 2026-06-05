@@ -155,10 +155,15 @@ Base URL：`http://localhost:8000/api`
 3. 發布按鈕（Google Sheets / 個人網頁 / 社交平台）、AI 配圖尺寸選項與狀態顯示
 
 目前模型選項已更新：
-- OpenAI：GPT-5.5、GPT-5.4、GPT-5.4 mini/nano，圖片預設 GPT Image 2
+- OpenAI：GPT-5.5、GPT-5.4、GPT-5.4 mini/nano，圖片預設 GPT Image 1.5
 - Anthropic：Claude Opus 4.8、Claude Sonnet 4.6、Claude Haiku 4.5
 - Gemini：Gemini 3.5 Flash、Gemini 3.1 Pro、Gemini 3.1 Flash-Lite
 - 圖片尺寸：Instagram 方形、Instagram Story/Reels、Facebook/LinkedIn 連結圖、X/Twitter 橫式圖、部落格封面
+
+圖片生成流程：
+- OpenAI GPT Image 模型會使用 `output_format`，不再傳舊版 `response_format`
+- 生成後若已設定 pCloud，系統會把圖片上傳到指定 pCloud 資料夾
+- 資料庫中的 `image_url` 會保存 pCloud 連結，而不是暫存的 base64 圖片資料
 
 ## 本機啟動方式（穩定模式）
 
@@ -288,6 +293,23 @@ NEXT_PUBLIC_API_BASE_URL=https://your-backend.onrender.com/api
 ```
 
 如果舊環境已經有 Render Free Postgres，從 `render.yaml` 移除資料庫不會自動刪除既有資料庫。確認新版本已經改用 Persistent Disk 後，可在 Render Dashboard 手動刪除不用的 Postgres，避免混淆。
+
+### pCloud 圖片上傳設定
+
+若要讓生成圖片自動上傳到 pCloud，請在 Render backend 設定：
+
+```bash
+PCLOUD_AUTH_TOKEN=你的 pCloud auth token
+PCLOUD_API_HOST=api.pcloud.com
+PCLOUD_FOLDER_ID=你的目標資料夾 ID
+# 或使用資料夾路徑，二選一：
+PCLOUD_FOLDER_PATH=/AI Article Images
+PCLOUD_CREATE_PUBLIC_LINK=true
+PCLOUD_USE_DIRECT_DOWNLOAD_LINK=true
+```
+
+pCloud 有 US 與 EU 兩個 API host。美國帳號通常用 `api.pcloud.com`，歐洲帳號通常用 `eapi.pcloud.com`。  
+如果你提供的是 pCloud 資料夾路徑，請填 `PCLOUD_FOLDER_PATH`；如果能取得資料夾 ID，優先填 `PCLOUD_FOLDER_ID`。
 
 ### 從舊資料庫搬到 Persistent Disk
 

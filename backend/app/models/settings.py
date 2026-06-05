@@ -29,7 +29,7 @@ class Setting(BaseModel):
 
     article_model: Mapped[str] = mapped_column(String(100), default="gpt-5.4-mini")
     prompt_model: Mapped[str] = mapped_column(String(100), default="gpt-5.4-mini")
-    image_model: Mapped[str] = mapped_column(String(100), default="gpt-image-2")
+    image_model: Mapped[str] = mapped_column(String(100), default="gpt-image-1.5")
 
     website_endpoint: Mapped[str | None] = mapped_column(String(500), nullable=True)
     social_endpoint: Mapped[str | None] = mapped_column(String(500), nullable=True)

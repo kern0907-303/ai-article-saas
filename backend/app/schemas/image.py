@@ -8,7 +8,7 @@ class ImageSettingsBase(BaseModel):
     default_provider: str = Field(default="openai")
     force_nano_banana_for_zh_text: bool = True
     nano_banana_model: str = "nano-banana-pro"
-    openai_image_model: str = "gpt-image-2"
+    openai_image_model: str = "gpt-image-1.5"
     default_size: str = "1080x1080"
     default_quality: str = "high"
     output_format: str = "png"

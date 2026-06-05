@@ -1,28 +1,30 @@
-databases:
-  - name: ai-article-saas-db
-    databaseName: ai_article_saas
-    user: ai_article_saas
-    plan: free
-
 services:
   - type: web
     name: ai-article-saas-backend
     env: python
     rootDir: backend
-    plan: free
+    plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    disk:
+      name: ai-article-saas-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
+      - key: RENDER_DISK_PATH
+        value: /var/data
       - key: DATABASE_URL
-        fromDatabase:
-          name: ai-article-saas-db
-          property: connectionString
+        value: sqlite:////var/data/ai-article-saas/app.db
+      - key: STORAGE_DIR
+        value: /var/data/ai-article-saas/storage
+      - key: AUTH_ENABLED
+        value: false
       - key: JWT_SECRET_KEY
-        generateValue: true
+        sync: false
       - key: ENCRYPTION_SECRET
-        generateValue: true
+        sync: false
       - key: ADMIN_API_KEY
-        generateValue: true
+        sync: false
       - key: REQUIRE_PERSISTENT_DATABASE
         value: true
       - key: CORS_ORIGINS

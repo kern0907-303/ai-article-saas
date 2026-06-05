@@ -239,16 +239,20 @@ NEXT_PUBLIC_AUTH_ENABLED=true
 如果你發現網站一更新、後端一重啟，會員帳號就像不存在，需要重新註冊，通常不是登入頁問題，而是後端資料庫沒有持久化。
 
 目前後端設定邏輯如下：
-- 若有 `DATABASE_URL`，優先使用資料庫服務（建議 PostgreSQL）
-- 若沒有 `DATABASE_URL`，會退回本機 SQLite `app.db`
+- 若有 `DATABASE_URL`，會使用指定資料庫位置
+- 若設定 `RENDER_DISK_PATH=/var/data`，預設會把 SQLite 放到 `/var/data/ai-article-saas/app.db`
+- `STORAGE_DIR` 建議放在同一個 Persistent Disk，例如 `/var/data/ai-article-saas/storage`
 - 在雲端平台若沒有 Persistent Disk 或外部資料庫，SQLite 檔案很容易在 redeploy 後消失
 
-正式環境建議至少設定以下後端環境變數：
+目前 Render Blueprint 採用「Persistent Disk + SQLite」方案，避免再新增外部資料庫服務。正式環境至少要設定以下後端環境變數：
 
 ```bash
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB_NAME
-JWT_SECRET_KEY=請填固定且夠長的隨機字串
-ENCRYPTION_SECRET=請填固定密鑰
+RENDER_DISK_PATH=/var/data
+DATABASE_URL=sqlite:////var/data/ai-article-saas/app.db
+STORAGE_DIR=/var/data/ai-article-saas/storage
+AUTH_ENABLED=false
+JWT_SECRET_KEY=請填固定且夠長的隨機字串，不要重新產生
+ENCRYPTION_SECRET=請填固定密鑰，不要重新產生，否則既有 API Key 會解不開
 ADMIN_API_KEY=請填固定且夠長的管理金鑰
 REQUIRE_PERSISTENT_DATABASE=true
 CORS_ORIGINS=https://你的前端網域
@@ -261,23 +265,29 @@ CORS_ORIGINS=https://你的前端網域
 
 `REQUIRE_PERSISTENT_DATABASE=true` 用於正式環境保護帳號資料。若後端沒有接上 PostgreSQL `DATABASE_URL` 或 Render Persistent Disk，後台會標示帳號資料不安全，服務仍會啟動，避免設定錯誤直接造成網站崩潰。
 
-### Render 部署建議
+### Render 部署建議：Persistent Disk
 
-本 repo 已新增根目錄 `render.yaml`，會自動建立：
-- 1 個 PostgreSQL 資料庫
+本 repo 根目錄 `render.yaml` 會建立：
 - 1 個 FastAPI backend 服務
-- 並把 backend 的 `DATABASE_URL` 直接綁到 PostgreSQL
+- 1 個掛載在 `/var/data` 的 Persistent Disk
+- 並把 backend 的 `DATABASE_URL` 固定到 `/var/data/ai-article-saas/app.db`
+- 知識庫檔案、未來圖片檔會保存到 `/var/data/ai-article-saas/storage`
+
+Render Persistent Disk 需要 paid web service，`render.yaml` 目前使用 `plan: starter` 與 `sizeGB: 1`。只有 disk mount path 底下的檔案會跨 deploy/restart 保存。
 
 部署時只要：
 
 1. 將 repo 連到 Render
 2. 使用 Blueprint / `render.yaml`
-3. 把 `CORS_ORIGINS` 改成你的前端網址
-4. 前端 `NEXT_PUBLIC_API_BASE_URL` 指向 Render backend，例如：
+3. 在 Render 後台填入固定的 `JWT_SECRET_KEY`、`ENCRYPTION_SECRET`、`ADMIN_API_KEY`
+4. 把 `CORS_ORIGINS` 改成你的前端網址
+5. 前端 `NEXT_PUBLIC_API_BASE_URL` 指向 Render backend，例如：
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=https://your-backend.onrender.com/api
 ```
+
+如果舊環境已經有 Render Free Postgres，從 `render.yaml` 移除資料庫不會自動刪除既有資料庫。確認新版本已經改用 Persistent Disk 後，可在 Render Dashboard 手動刪除不用的 Postgres，避免混淆。
 
 ### 本機開發
 

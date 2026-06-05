@@ -52,6 +52,8 @@ class AppSettings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def normalize_database_url(cls, value: str) -> str:
+        if not isinstance(value, str) or not value.strip():
+            return _default_database_url()
         if isinstance(value, str) and value.startswith("postgres://"):
             return value.replace("postgres://", "postgresql://", 1)
         return value

@@ -1,4 +1,7 @@
 from datetime import datetime, timedelta
+import os
+import subprocess
+import sys
 
 from app.api.admin import build_account_storage_status, build_admin_account_rows
 
@@ -59,3 +62,23 @@ def test_admin_account_rows_include_account_subscription_and_content_counts():
     assert row.article_count == 3
     assert row.knowledge_file_count == 2
     assert row.payment_count == 1
+
+
+def test_require_persistent_database_flag_does_not_crash_app_import():
+    env = {
+        **os.environ,
+        "PYTHONPATH": "backend",
+        "REQUIRE_PERSISTENT_DATABASE": "true",
+        "DATABASE_URL": "",
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", "import app.main; print('ok')"],
+        cwd=os.getcwd(),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "ok" in result.stdout

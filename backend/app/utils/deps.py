@@ -3,16 +3,41 @@ from datetime import datetime
 import jwt
 from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.config import settings as app_settings
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, hash_password
 from app.models.user import User
 from app.services.rate_limit_service import check_rate_limit
 from app.services.subscription_service import get_active_subscription, normalize_utc_naive
 
 bearer_scheme = HTTPBearer(auto_error=False)
+DEFAULT_LOCAL_USER_EMAIL = "local@ai-article-saas.internal"
+
+
+def get_or_create_local_user(db: Session) -> User:
+    user = db.query(User).filter(User.email == DEFAULT_LOCAL_USER_EMAIL).first()
+    if user:
+        return user
+
+    user = User(
+        email=DEFAULT_LOCAL_USER_EMAIL,
+        hashed_password=hash_password("auth-disabled-local-user"),
+        token_version=1,
+    )
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        user = db.query(User).filter(User.email == DEFAULT_LOCAL_USER_EMAIL).first()
+        if not user:
+            raise
+        return user
+    db.refresh(user)
+    return user
 
 
 def get_current_user(
@@ -20,6 +45,12 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
+    if not app_settings.auth_enabled:
+        user = get_or_create_local_user(db)
+        request.state.current_user = user
+        request.state.jwt_payload = {"sub": str(user.id), "mode": "auth-disabled"}
+        return user
+
     if not credentials or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="缺少或無效的 Token")
 
@@ -56,6 +87,9 @@ def require_active_subscription(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> User:
+    if not app_settings.auth_enabled:
+        return current_user
+
     sub = get_active_subscription(db, current_user.id)
     if not sub:
         raise HTTPException(

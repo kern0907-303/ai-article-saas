@@ -1,4 +1,5 @@
 import { clearToken, getToken } from "@/lib/auth";
+import { isAuthEnabled } from "@/lib/auth-config";
 import {
   AdminRecentPayment,
   AdminRecentUser,
@@ -80,7 +81,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const payload = await parseErrorPayload(res);
-    if (res.status === 401) {
+    if (res.status === 401 && isAuthEnabled()) {
       clearToken();
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
         window.location.href = "/login";

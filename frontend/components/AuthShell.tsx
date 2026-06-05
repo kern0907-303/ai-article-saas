@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import Sidebar from "@/components/Sidebar";
+import { isAuthEnabled } from "@/lib/auth-config";
 import { getToken } from "@/lib/auth";
 
 const PUBLIC_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password"];
@@ -25,6 +26,16 @@ export default function AuthShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
+
+    if (!isAuthEnabled()) {
+      if (isPublicRoute) {
+        setRedirecting(true);
+        router.replace("/settings");
+        return;
+      }
+      setRedirecting(false);
+      return;
+    }
 
     if (!token && !isPublicRoute) {
       setRedirecting(true);

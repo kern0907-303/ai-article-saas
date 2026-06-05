@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.config import settings as app_settings
 from app.models.knowledge_file import KnowledgeFile
 from app.models.plan import Plan
 from app.models.subscription import Subscription
@@ -43,6 +44,35 @@ def _is_subscription_active(sub: Subscription | None) -> bool:
 
 
 def get_entitlements(db: Session, user_id: int) -> dict:
+    if not app_settings.auth_enabled:
+        return {
+            "status": "active",
+            "access_tier": "paid",
+            "plan_code": "auth-disabled",
+            "started_at": None,
+            "expires_at": None,
+            "is_active": True,
+            "trial_used": False,
+            "limits": {
+                "article_generate_per_day": -1,
+                "prompt_expand_per_day": -1,
+                "image_generate_per_day": -1,
+                "knowledge_total_bytes": -1,
+            },
+            "usage": {
+                "article_generate_today": 0,
+                "prompt_expand_today": 0,
+                "image_generate_today": 0,
+                "knowledge_total_bytes": 0,
+            },
+            "remaining": {
+                "article_generate_today": -1,
+                "prompt_expand_today": -1,
+                "image_generate_today": -1,
+                "knowledge_total_bytes": -1,
+            },
+        }
+
     sub, plan = _find_latest_subscription(db, user_id)
     active = _is_subscription_active(sub)
     tier = sub.access_tier if sub and sub.access_tier else "inactive"

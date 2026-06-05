@@ -208,14 +208,31 @@ npm run dev -- -p 3001
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
-NEXT_PUBLIC_DEMO_USER_ID=demo-user
+NEXT_PUBLIC_AUTH_ENABLED=false
 ```
 
 建議改為：
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001/api
+NEXT_PUBLIC_AUTH_ENABLED=false
 ```
+
+## 登入功能開關
+
+目前登入功能預設關閉，但程式碼與登入頁保留。關閉時前端會隱藏登入、註冊、忘記密碼與登出入口，後端會使用一個本機預設帳號處理 API 請求，避免帳號資料庫不穩定造成網站不能用。
+
+若未來要重新啟用登入：
+
+```bash
+# backend
+AUTH_ENABLED=true
+
+# frontend
+NEXT_PUBLIC_AUTH_ENABLED=true
+```
+
+重新啟用前請先接好持久化資料庫，例如 PostgreSQL，避免帳號再次因部署或重啟消失。
 
 ## 生產環境資料持久化
 
@@ -242,7 +259,7 @@ CORS_ORIGINS=https://你的前端網域
 - 註冊帳號列表
 - 每個帳號的訂閱狀態、文章數、知識庫檔案數與付款筆數
 
-`REQUIRE_PERSISTENT_DATABASE=true` 用於正式環境保護帳號資料。若後端沒有接上 PostgreSQL `DATABASE_URL` 或 Render Persistent Disk，服務會拒絕啟動，避免在不穩定 SQLite 環境中繼續新增帳號。
+`REQUIRE_PERSISTENT_DATABASE=true` 用於正式環境保護帳號資料。若後端沒有接上 PostgreSQL `DATABASE_URL` 或 Render Persistent Disk，後台會標示帳號資料不安全，服務仍會啟動，避免設定錯誤直接造成網站崩潰。
 
 ### Render 部署建議
 

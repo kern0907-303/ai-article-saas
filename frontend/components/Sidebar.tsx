@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import { isAuthEnabled } from "@/lib/auth-config";
 import { clearToken } from "@/lib/auth";
 
 const navItems = [
@@ -47,13 +48,15 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <button
-        type="button"
-        onClick={logout}
-        className="mt-6 w-full rounded-lg border border-[#efb24e] bg-white/72 px-3 py-2 text-sm text-[var(--text)] transition hover:bg-white/90"
-      >
-        登出
-      </button>
+      {isAuthEnabled() ? (
+        <button
+          type="button"
+          onClick={logout}
+          className="mt-6 w-full rounded-lg border border-[#efb24e] bg-white/72 px-3 py-2 text-sm text-[var(--text)] transition hover:bg-white/90"
+        >
+          登出
+        </button>
+      ) : null}
     </aside>
   );
 }

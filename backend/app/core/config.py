@@ -45,6 +45,7 @@ class AppSettings(BaseSettings):
     encryption_secret: str = "replace-with-32-byte-base64-key"
 
     expose_reset_token_in_response: bool = True
+    auth_enabled: bool = False
     admin_api_key: str = "change-admin-key-in-production"
     require_persistent_database: bool = False
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)

@@ -289,6 +289,29 @@ NEXT_PUBLIC_API_BASE_URL=https://your-backend.onrender.com/api
 
 如果舊環境已經有 Render Free Postgres，從 `render.yaml` 移除資料庫不會自動刪除既有資料庫。確認新版本已經改用 Persistent Disk 後，可在 Render Dashboard 手動刪除不用的 Postgres，避免混淆。
 
+### 從舊資料庫搬到 Persistent Disk
+
+如果已經在舊 Render Postgres 設定過 API Keys 或 Google Sheets 目的地，先不要刪舊資料庫。請在 Render Shell 或一次性 Job 執行：
+
+```bash
+cd backend
+python scripts/migrate_database_to_disk.py \
+  --source-url "$OLD_DATABASE_URL" \
+  --target-url "sqlite:////var/data/ai-article-saas/app.db" \
+  --remap-to-local-user
+```
+
+其中 `OLD_DATABASE_URL` 是舊 Render Postgres 的 external connection string。  
+`--remap-to-local-user` 會把舊帳號底下的 `settings`、`google_sheet_destinations`、`articles` 等資料搬到目前登入關閉模式使用的本機預設帳號，讓網站立刻看得到。
+
+如果新的 Persistent Disk SQLite 已經有錯誤或測試資料，而且確認不要保留，可加：
+
+```bash
+--replace-target
+```
+
+搬移工具只複製資料列，不會解密或重寫 API Key / Google Sheets Service Account JSON。只要 `ENCRYPTION_SECRET` 維持跟舊設定時相同，搬過去後就能正常解密使用。
+
 ### 本機開發
 
 可參考 `backend/.env.example` 建立 `backend/.env`：

@@ -84,3 +84,23 @@ def test_upload_data_url_to_pcloud_can_return_public_share_link(monkeypatch):
     public_request = FakeClient.requests[1]
     assert public_request["url"] == "https://api.pcloud.com/getfilepublink"
     assert public_request["params"]["fileid"] == 321
+
+
+def test_upload_data_url_to_pcloud_saves_to_local_public_folder(tmp_path):
+    data_url = f"data:image/png;base64,{base64.b64encode(b'image-bytes').decode()}"
+
+    url = upload_data_url_to_pcloud(
+        PCloudConfig(
+            auth_token=None,
+            public_folder_path=str(tmp_path),
+            public_base_url="https://public.example.com/article",
+        ),
+        data_url=data_url,
+        article_id=7,
+        image_id=9,
+    )
+
+    saved_files = list(tmp_path.iterdir())
+    assert len(saved_files) == 1
+    assert saved_files[0].read_bytes() == b"image-bytes"
+    assert url.startswith("https://public.example.com/article/article-7-image-9-")

@@ -2,6 +2,8 @@ import base64
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
+from urllib.parse import quote
 from uuid import uuid4
 
 import httpx
@@ -16,12 +18,22 @@ class PCloudConfig:
     api_host: str = "api.pcloud.com"
     folder_id: int | None = None
     folder_path: str | None = None
+    public_folder_path: str | None = None
+    public_base_url: str | None = None
     create_public_link: bool = True
     use_direct_download_link: bool = True
 
     @property
     def enabled(self) -> bool:
+        return self.api_upload_enabled or self.local_public_folder_enabled
+
+    @property
+    def api_upload_enabled(self) -> bool:
         return bool((self.auth_token or "").strip() and (self.folder_id is not None or (self.folder_path or "").strip()))
+
+    @property
+    def local_public_folder_enabled(self) -> bool:
+        return bool((self.public_folder_path or "").strip())
 
     @property
     def api_base(self) -> str:
@@ -51,6 +63,22 @@ def build_image_filename(*, article_id: int, image_id: int, mime: str) -> str:
     return f"article-{article_id}-image-{image_id}-{timestamp}-{uuid4().hex[:8]}.{extension_from_mime(mime)}"
 
 
+def build_public_folder_url(base_url: str | None, filename: str) -> str | None:
+    if not base_url:
+        return None
+    return f"{base_url.rstrip('/')}/{quote(filename)}"
+
+
+def save_to_public_folder(config: PCloudConfig, *, filename: str, content: bytes) -> str | None:
+    if not config.local_public_folder_enabled:
+        return None
+    folder = Path(config.public_folder_path or "").expanduser()
+    folder.mkdir(parents=True, exist_ok=True)
+    file_path = folder / filename
+    file_path.write_bytes(content)
+    return build_public_folder_url(config.public_base_url, filename) or str(file_path)
+
+
 def _raise_for_pcloud_error(payload: dict) -> None:
     if int(payload.get("result", 0) or 0) != 0:
         message = payload.get("error") or payload.get("message") or "pCloud API error"
@@ -69,7 +97,7 @@ def _request_json(method: str, url: str, **kwargs) -> dict:
 
 
 def upload_file(config: PCloudConfig, *, filename: str, content: bytes, mime: str) -> int:
-    if not config.enabled:
+    if not config.api_upload_enabled:
         raise RuntimeError("pCloud 尚未設定 PCLOUD_AUTH_TOKEN 與 PCLOUD_FOLDER_ID 或 PCLOUD_FOLDER_PATH")
 
     data: dict[str, str | int] = {
@@ -132,6 +160,10 @@ def create_direct_download_link(config: PCloudConfig, file_id: int, mime: str) -
 def upload_data_url_to_pcloud(config: PCloudConfig, *, data_url: str, article_id: int, image_id: int) -> str:
     content, mime = decode_data_url(data_url)
     filename = build_image_filename(article_id=article_id, image_id=image_id, mime=mime)
+    local_url = save_to_public_folder(config, filename=filename, content=content)
+    if local_url:
+        return local_url
+
     file_id = upload_file(config, filename=filename, content=content, mime=mime)
     return (
         create_direct_download_link(config, file_id, mime)

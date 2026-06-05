@@ -60,6 +60,8 @@ def _get_pcloud_config() -> PCloudConfig:
         api_host=app_settings.pcloud_api_host,
         folder_id=app_settings.pcloud_folder_id,
         folder_path=app_settings.pcloud_folder_path,
+        public_folder_path=app_settings.pcloud_public_folder_path,
+        public_base_url=app_settings.pcloud_public_base_url,
         create_public_link=app_settings.pcloud_create_public_link,
         use_direct_download_link=app_settings.pcloud_use_direct_download_link,
     )

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.article import Article
+from app.models.article_image import ArticleImage
 from app.models.google_sheet_destination import GoogleSheetDestination
 from app.schemas.google_sheets import (
     ExportArticleToSheetRequest,
@@ -177,7 +178,17 @@ def export_article_to_google_sheets(
     if not service_account_json:
         raise HTTPException(status_code=400, detail="Google Sheets Service Account JSON 無法解密，請重新儲存目的地")
 
-    row = build_article_sheet_row(article, destination_label=destination.label)
+    image_links = [
+        image.image_url
+        for image in (
+            db.query(ArticleImage)
+            .filter(ArticleImage.article_id == article.id, ArticleImage.user_id == user_id, ArticleImage.status == "generated")
+            .order_by(ArticleImage.updated_at.desc())
+            .all()
+        )
+        if image.image_url
+    ]
+    row = build_article_sheet_row(article, destination_label=destination.label, image_links=image_links)
     try:
         result = append_article_row_to_sheet(
             service_account_json=service_account_json,

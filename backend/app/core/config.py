@@ -53,6 +53,8 @@ class AppSettings(BaseSettings):
     pcloud_api_host: str = "api.pcloud.com"
     pcloud_folder_id: int | None = None
     pcloud_folder_path: str | None = None
+    pcloud_public_folder_path: str | None = None
+    pcloud_public_base_url: str | None = None
     pcloud_create_public_link: bool = True
     pcloud_use_direct_download_link: bool = True
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)

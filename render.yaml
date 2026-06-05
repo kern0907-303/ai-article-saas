@@ -37,6 +37,10 @@ services:
         sync: false
       - key: PCLOUD_FOLDER_PATH
         sync: false
+      - key: PCLOUD_PUBLIC_FOLDER_PATH
+        sync: false
+      - key: PCLOUD_PUBLIC_BASE_URL
+        sync: false
       - key: PCLOUD_CREATE_PUBLIC_LINK
         value: true
       - key: PCLOUD_USE_DIRECT_DOWNLOAD_LINK

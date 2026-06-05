@@ -56,7 +56,7 @@ def normalize_sheet_destination_payload(payload: dict[str, Any]) -> dict[str, An
     return data
 
 
-def build_article_sheet_row(article: Any, destination_label: str) -> list[Any]:
+def build_article_sheet_row(article: Any, destination_label: str, image_links: list[str] | None = None) -> list[Any]:
     updated_at = getattr(article, "updated_at", None) or datetime.utcnow()
     if hasattr(updated_at, "isoformat"):
         updated_text = updated_at.isoformat()
@@ -74,6 +74,7 @@ def build_article_sheet_row(article: Any, destination_label: str) -> list[Any]:
         article.generation_status,
         "yes" if article.published_to_website else "no",
         "yes" if article.published_to_social else "no",
+        "\n".join(image_links or []),
     ]
 
 
@@ -116,7 +117,7 @@ def append_article_row_to_sheet(
     row: list[Any],
 ) -> GoogleSheetsAppendResult:
     access_token = fetch_access_token(service_account_json)
-    range_name = f"{sheet_name}!A:J"
+    range_name = f"{sheet_name}!A:K"
     url = SHEETS_APPEND_URL.format(
         spreadsheet_id=quote(spreadsheet_id, safe=""),
         range_name=quote(range_name, safe=""),

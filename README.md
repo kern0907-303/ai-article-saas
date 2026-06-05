@@ -164,6 +164,7 @@ Base URL：`http://localhost:8000/api`
 - OpenAI GPT Image 模型會使用 `output_format`，不再傳舊版 `response_format`
 - 生成後若已設定 pCloud，系統會把圖片上傳到指定 pCloud 資料夾
 - 資料庫中的 `image_url` 會保存 pCloud 連結，而不是暫存的 base64 圖片資料
+- 上傳 Google Sheets 時，系統會把該文章已生成圖片連結寫到第 K 欄
 
 ## 本機啟動方式（穩定模式）
 
@@ -310,6 +311,15 @@ PCLOUD_USE_DIRECT_DOWNLOAD_LINK=true
 
 pCloud 有 US 與 EU 兩個 API host。美國帳號通常用 `api.pcloud.com`，歐洲帳號通常用 `eapi.pcloud.com`。  
 如果你提供的是 pCloud 資料夾路徑，請填 `PCLOUD_FOLDER_PATH`；如果能取得資料夾 ID，優先填 `PCLOUD_FOLDER_ID`。
+
+若後端是跑在可存取 pCloud Drive 的本機或伺服器，也可以直接存到 pCloud Drive Public Folder：
+
+```bash
+PCLOUD_PUBLIC_FOLDER_PATH=/Users/erickair/pCloud Drive/Public Folder/article
+PCLOUD_PUBLIC_BASE_URL=https://你的-pCloud-Public-Folder-直接連結/article
+```
+
+`PCLOUD_PUBLIC_FOLDER_PATH` 負責存檔，`PCLOUD_PUBLIC_BASE_URL` 負責組成可貼到 Google Sheets 的圖片網址。若未設定 `PCLOUD_PUBLIC_BASE_URL`，系統會先保存本機檔案路徑，但 Google Sheets 裡的連結不一定能在其他裝置開啟。
 
 ### 從舊資料庫搬到 Persistent Disk
 

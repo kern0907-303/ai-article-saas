@@ -51,7 +51,11 @@ def test_normalize_sheet_destination_payload_rejects_invalid_json():
 
 
 def test_build_article_sheet_row_contains_publish_ready_fields():
-    row = build_article_sheet_row(ArticleStub(), destination_label="客戶 A")
+    row = build_article_sheet_row(
+        ArticleStub(),
+        destination_label="客戶 A",
+        image_links=["https://public.example.com/article/cover.png"],
+    )
 
     assert row[0] == "2026-06-04T10:00:00"
     assert row[1] == "客戶 A"
@@ -60,14 +64,15 @@ def test_build_article_sheet_row_contains_publish_ready_fields():
     assert row[5] == "這是一篇已完成文章"
     assert row[6] == "gpt-5.4-mini"
     assert row[9] == "yes"
+    assert row[10] == "https://public.example.com/article/cover.png"
 
 
 def test_append_result_reports_updated_range():
     result = GoogleSheetsAppendResult(
         spreadsheet_id="sheet-123",
         sheet_name="文章準備",
-        updated_range="文章準備!A2:J2",
+        updated_range="文章準備!A2:K2",
         updated_rows=1,
     )
 
-    assert result.updated_range == "文章準備!A2:J2"
+    assert result.updated_range == "文章準備!A2:K2"

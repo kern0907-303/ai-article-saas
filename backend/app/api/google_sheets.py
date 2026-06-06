@@ -49,6 +49,7 @@ def _get_pcloud_config() -> PCloudConfig:
         api_host=app_settings.pcloud_api_host,
         folder_id=app_settings.pcloud_folder_id,
         folder_path=app_settings.pcloud_folder_path,
+        upload_link_code=app_settings.pcloud_upload_link_code,
         public_folder_path=app_settings.pcloud_public_folder_path,
         public_base_url=app_settings.pcloud_public_base_url,
         create_public_link=app_settings.pcloud_create_public_link,
@@ -69,7 +70,7 @@ def _resolve_sheet_image_link(image: ArticleImage, *, article_id: int) -> str | 
     if not pcloud_config.enabled:
         raise HTTPException(
             status_code=400,
-            detail="圖片尚未轉成公開網址。請先在後端設定 pCloud API 或 PCLOUD_PUBLIC_FOLDER_PATH + PCLOUD_PUBLIC_BASE_URL。",
+            detail="圖片尚未轉成公開網址。請先在後端設定 PCLOUD_UPLOAD_LINK_CODE + PCLOUD_PUBLIC_BASE_URL、pCloud API，或 PCLOUD_PUBLIC_FOLDER_PATH + PCLOUD_PUBLIC_BASE_URL。",
         )
 
     public_url = upload_data_url_to_pcloud(pcloud_config, data_url=image_url, article_id=article_id, image_id=image.id)

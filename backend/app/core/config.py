@@ -64,6 +64,7 @@ class AppSettings(BaseSettings):
     pcloud_api_host: str = "api.pcloud.com"
     pcloud_folder_id: int | None = None
     pcloud_folder_path: str | None = None
+    pcloud_upload_link_code: str | None = None
     pcloud_public_folder_path: str | None = _default_pcloud_public_folder_path()
     pcloud_public_base_url: str | None = None
     pcloud_create_public_link: bool = True

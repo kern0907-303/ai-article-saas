@@ -18,6 +18,7 @@ class PCloudConfig:
     api_host: str = "api.pcloud.com"
     folder_id: int | None = None
     folder_path: str | None = None
+    upload_link_code: str | None = None
     public_folder_path: str | None = None
     public_base_url: str | None = None
     create_public_link: bool = True
@@ -25,7 +26,7 @@ class PCloudConfig:
 
     @property
     def enabled(self) -> bool:
-        return self.api_upload_enabled or self.local_public_folder_enabled
+        return self.api_upload_enabled or self.upload_link_enabled or self.local_public_folder_enabled
 
     @property
     def api_upload_enabled(self) -> bool:
@@ -34,6 +35,10 @@ class PCloudConfig:
     @property
     def local_public_folder_enabled(self) -> bool:
         return bool((self.public_folder_path or "").strip())
+
+    @property
+    def upload_link_enabled(self) -> bool:
+        return bool((self.upload_link_code or "").strip() and (self.public_base_url or "").strip())
 
     @property
     def api_base(self) -> str:
@@ -123,6 +128,22 @@ def upload_file(config: PCloudConfig, *, filename: str, content: bytes, mime: st
     return int(fileids[0])
 
 
+def upload_file_to_upload_link(config: PCloudConfig, *, filename: str, content: bytes, mime: str) -> str:
+    if not config.upload_link_enabled:
+        raise RuntimeError("pCloud 尚未設定 PCLOUD_UPLOAD_LINK_CODE 與 PCLOUD_PUBLIC_BASE_URL")
+
+    _request_json(
+        "POST",
+        f"{config.api_base}/uploadtolink",
+        data={"code": config.upload_link_code or "", "nopartial": 1},
+        files={"file": (filename, content, mime)},
+    )
+    public_url = build_public_folder_url(config.public_base_url, filename)
+    if not public_url:
+        raise RuntimeError("pCloud upload link 已上傳，但缺少 PCLOUD_PUBLIC_BASE_URL，無法產生圖片連結")
+    return public_url
+
+
 def create_file_public_link(config: PCloudConfig, file_id: int) -> str | None:
     if not config.create_public_link:
         return None
@@ -163,6 +184,9 @@ def upload_data_url_to_pcloud(config: PCloudConfig, *, data_url: str, article_id
     local_url = save_to_public_folder(config, filename=filename, content=content)
     if local_url:
         return local_url
+
+    if config.upload_link_enabled:
+        return upload_file_to_upload_link(config, filename=filename, content=content, mime=mime)
 
     file_id = upload_file(config, filename=filename, content=content, mime=mime)
     return (

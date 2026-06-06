@@ -60,6 +60,7 @@ def _get_pcloud_config() -> PCloudConfig:
         api_host=app_settings.pcloud_api_host,
         folder_id=app_settings.pcloud_folder_id,
         folder_path=app_settings.pcloud_folder_path,
+        upload_link_code=app_settings.pcloud_upload_link_code,
         public_folder_path=app_settings.pcloud_public_folder_path,
         public_base_url=app_settings.pcloud_public_base_url,
         create_public_link=app_settings.pcloud_create_public_link,
@@ -90,7 +91,7 @@ def _ensure_public_image_link(record: ArticleImage, *, article_id: int) -> str:
     if not pcloud_config.enabled:
         raise HTTPException(
             status_code=400,
-            detail="尚未設定 pCloud。請設定 PCLOUD_AUTH_TOKEN + PCLOUD_FOLDER_ID/PCLOUD_FOLDER_PATH，或 PCLOUD_PUBLIC_FOLDER_PATH + PCLOUD_PUBLIC_BASE_URL。",
+            detail="尚未設定 pCloud。請設定 PCLOUD_UPLOAD_LINK_CODE + PCLOUD_PUBLIC_BASE_URL、PCLOUD_AUTH_TOKEN + PCLOUD_FOLDER_ID/PCLOUD_FOLDER_PATH，或 PCLOUD_PUBLIC_FOLDER_PATH + PCLOUD_PUBLIC_BASE_URL。",
         )
 
     public_url = upload_data_url_to_pcloud(pcloud_config, data_url=image_url, article_id=article_id, image_id=record.id)

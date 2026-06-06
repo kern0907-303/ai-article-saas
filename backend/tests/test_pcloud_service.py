@@ -32,6 +32,8 @@ class FakeClient:
         self.requests.append({"method": method, "url": url, **kwargs})
         if url.endswith("/uploadfile"):
             return FakeResponse({"result": 0, "fileids": [321]})
+        if url.endswith("/uploadtolink"):
+            return FakeResponse({"result": 0})
         if url.endswith("/getfilelink"):
             return FakeResponse({"result": 0, "hosts": ["c1.pcloud.com"], "path": "/hash/generated.png"})
         if url.endswith("/getfilepublink"):
@@ -105,6 +107,29 @@ def test_upload_data_url_to_pcloud_saves_to_local_public_folder(tmp_path):
     assert len(saved_files) == 1
     assert saved_files[0].read_bytes() == b"image-bytes"
     assert url.startswith("https://public.example.com/article/article-7-image-9-")
+
+
+def test_upload_data_url_to_pcloud_can_use_upload_link_code(monkeypatch):
+    FakeClient.requests = []
+    monkeypatch.setattr(pcloud_service.httpx, "Client", FakeClient)
+    data_url = f"data:image/png;base64,{base64.b64encode(b'image-bytes').decode()}"
+
+    url = upload_data_url_to_pcloud(
+        PCloudConfig(
+            auth_token=None,
+            upload_link_code="upload-code",
+            public_base_url="https://filedn.com/example/article",
+        ),
+        data_url=data_url,
+        article_id=7,
+        image_id=9,
+    )
+
+    upload_request = FakeClient.requests[0]
+    assert upload_request["url"] == "https://api.pcloud.com/uploadtolink"
+    assert upload_request["data"]["code"] == "upload-code"
+    assert upload_request["files"]["file"][0].startswith("article-7-image-9-")
+    assert url.startswith("https://filedn.com/example/article/article-7-image-9-")
 
 
 def test_default_pcloud_public_folder_path_uses_env_when_configured(monkeypatch, tmp_path):

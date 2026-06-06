@@ -46,6 +46,11 @@ const isPublicSheetImage = (image: ArticleImage) =>
   !!image.image_url &&
   (image.image_url.startsWith("http://") || image.image_url.startsWith("https://"));
 
+const isSheetSelectableImage = (image: ArticleImage) =>
+  image.status === "generated" &&
+  !!image.image_url &&
+  (image.image_url.startsWith("http://") || image.image_url.startsWith("https://") || image.image_url.startsWith("data:image/"));
+
 const imageFileExtension = (imageUrl: string) => {
   const dataMatch = imageUrl.match(/^data:image\/(png|jpeg|jpg|webp);/);
   if (dataMatch) return dataMatch[1] === "jpeg" ? "jpg" : dataMatch[1];
@@ -101,20 +106,22 @@ export default function ArticlesPage() {
     () => articles.find((item) => item.id === currentArticleId) || null,
     [articles, currentArticleId],
   );
-  const publicSheetImages = useMemo(() => images.filter(isPublicSheetImage), [images]);
+  const sheetSelectableImages = useMemo(() => images.filter(isSheetSelectableImage), [images]);
   const selectedSheetImageLinks = useMemo(
     () =>
-      publicSheetImages
+      sheetSelectableImages
         .filter((image) => selectedSheetImageIds.includes(image.id))
         .map((image) => image.image_url)
-        .filter(Boolean),
-    [publicSheetImages, selectedSheetImageIds],
+        .filter((url) => url.startsWith("http://") || url.startsWith("https://")),
+    [sheetSelectableImages, selectedSheetImageIds],
   );
 
   useEffect(() => {
-    const publicIds = publicSheetImages.map((image) => image.id);
-    setSelectedSheetImageIds((prev) => (imageSelectionTouched ? prev.filter((id) => publicIds.includes(id)) : publicIds));
-  }, [imageSelectionTouched, publicSheetImages]);
+    const selectableIds = sheetSelectableImages.map((image) => image.id);
+    setSelectedSheetImageIds((prev) =>
+      imageSelectionTouched ? prev.filter((id) => selectableIds.includes(id)) : selectableIds,
+    );
+  }, [imageSelectionTouched, sheetSelectableImages]);
 
   useEffect(() => {
     setImageSelectionTouched(false);
@@ -736,7 +743,7 @@ export default function ArticlesPage() {
                 )}
                 <label
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
-                    isPublicSheetImage(image)
+                    isSheetSelectableImage(image)
                       ? "border-emerald-200 bg-emerald-50 text-emerald-900"
                       : "border-slate-200 bg-slate-50 text-slate-500"
                   }`}
@@ -745,13 +752,15 @@ export default function ArticlesPage() {
                     type="checkbox"
                     className="h-4 w-4 rounded border-slate-300 text-emerald-600"
                     checked={selectedSheetImageIds.includes(image.id)}
-                    disabled={!isPublicSheetImage(image)}
+                    disabled={!isSheetSelectableImage(image)}
                     onChange={() => toggleSheetImage(image.id)}
                   />
                   <span>
                     {isPublicSheetImage(image)
                       ? "上傳此圖片連結到 Google Sheets"
-                      : "圖片可下載，但目前沒有公開網址可寫入 Google Sheets"}
+                      : image.image_url?.startsWith("data:image/")
+                        ? "上傳時先轉成 pCloud 公開連結，再寫入 Google Sheets"
+                        : "圖片可下載，但目前沒有公開網址可寫入 Google Sheets"}
                   </span>
                 </label>
                 {image.provider === "nano_banana" && (
@@ -786,9 +795,9 @@ export default function ArticlesPage() {
           >
             {exportingSheet ? "上傳中..." : "上傳到 Google Sheets"}
           </button>
-          {publicSheetImages.length > 0 && (
+          {sheetSelectableImages.length > 0 && (
             <p className="self-end pb-2 text-xs text-slate-600">
-              已勾選 {selectedSheetImageLinks.length} / {publicSheetImages.length} 張圖片連結
+              已勾選 {selectedSheetImageIds.length} / {sheetSelectableImages.length} 張圖片
             </p>
           )}
           <button

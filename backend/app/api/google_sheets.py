@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings as app_settings
 from app.core.database import get_db
 from app.models.article import Article
 from app.models.article_image import ArticleImage
@@ -22,6 +23,7 @@ from app.services.google_sheets_service import (
     build_article_sheet_rows,
     normalize_sheet_destination_payload,
 )
+from app.services.pcloud_service import PCloudConfig, upload_data_url_to_pcloud
 from app.utils.deps import get_current_user_id, require_active_subscription
 
 router = APIRouter(tags=["google-sheets"])
@@ -39,6 +41,46 @@ def _set_single_default(db: Session, user_id: str, destination: GoogleSheetDesti
 
 def _out(destination: GoogleSheetDestination) -> GoogleSheetDestinationOut:
     return GoogleSheetDestinationOut.model_validate(destination)
+
+
+def _get_pcloud_config() -> PCloudConfig:
+    return PCloudConfig(
+        auth_token=app_settings.pcloud_auth_token,
+        api_host=app_settings.pcloud_api_host,
+        folder_id=app_settings.pcloud_folder_id,
+        folder_path=app_settings.pcloud_folder_path,
+        public_folder_path=app_settings.pcloud_public_folder_path,
+        public_base_url=app_settings.pcloud_public_base_url,
+        create_public_link=app_settings.pcloud_create_public_link,
+        use_direct_download_link=app_settings.pcloud_use_direct_download_link,
+    )
+
+
+def _resolve_sheet_image_link(image: ArticleImage, *, article_id: int) -> str | None:
+    image_url = (image.image_url or "").strip()
+    if not image_url:
+        return None
+    if image_url.startswith(("http://", "https://")):
+        return image_url
+    if not image_url.startswith("data:image/"):
+        return None
+
+    pcloud_config = _get_pcloud_config()
+    if not pcloud_config.enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="圖片尚未轉成公開網址。請先在後端設定 pCloud API 或 PCLOUD_PUBLIC_FOLDER_PATH + PCLOUD_PUBLIC_BASE_URL。",
+        )
+
+    public_url = upload_data_url_to_pcloud(pcloud_config, data_url=image_url, article_id=article_id, image_id=image.id)
+    if not public_url.startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=400,
+            detail="圖片已存到 pCloud 資料夾，但尚未產生公開網址。請設定 PCLOUD_PUBLIC_BASE_URL，或改用 pCloud API 公開連結設定。",
+        )
+
+    image.image_url = public_url
+    return public_url
 
 
 @router.get("/google-sheets/destinations", response_model=list[GoogleSheetDestinationOut])
@@ -202,11 +244,12 @@ def export_article_to_google_sheets(
             )
             if payload.selected_image_ids is not None:
                 image_query = image_query.filter(ArticleImage.id.in_(payload.selected_image_ids))
-            image_links = [
-                image.image_url
-                for image in image_query.order_by(ArticleImage.updated_at.desc()).all()
-                if image.image_url
-            ]
+            image_links = []
+            for image in image_query.order_by(ArticleImage.updated_at.desc()).all():
+                resolved_link = _resolve_sheet_image_link(image, article_id=article.id)
+                if resolved_link:
+                    image_links.append(resolved_link)
+            db.commit()
         if payload.selected_image_ids not in (None, []) and not image_links:
             image_links = payload.fallback_image_links or []
     else:

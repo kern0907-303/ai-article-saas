@@ -1,7 +1,10 @@
 from datetime import datetime
+from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
+from app.api import google_sheets
 from app.services.google_sheets_service import (
     GOOGLE_SHEETS_CELL_LIMIT,
     OVERSIZED_CELL_PLACEHOLDER,
@@ -11,6 +14,7 @@ from app.services.google_sheets_service import (
     normalize_sheet_destination_payload,
     sanitize_sheet_rows,
 )
+from app.services.pcloud_service import PCloudConfig
 
 
 class ArticleStub:
@@ -119,3 +123,32 @@ def test_append_result_reports_updated_range():
     )
 
     assert result.updated_range == "文章準備!A2:K2"
+
+
+def test_resolve_sheet_image_link_returns_public_url():
+    image = SimpleNamespace(id=9, image_url="https://public.example.com/article/cover.png")
+
+    assert google_sheets._resolve_sheet_image_link(image, article_id=42) == "https://public.example.com/article/cover.png"
+
+
+def test_resolve_sheet_image_link_requires_pcloud_for_data_url(monkeypatch):
+    image = SimpleNamespace(id=9, image_url="data:image/png;base64,abc")
+    monkeypatch.setattr(google_sheets, "_get_pcloud_config", lambda: PCloudConfig(auth_token=None))
+
+    with pytest.raises(HTTPException, match="圖片尚未轉成公開網址"):
+        google_sheets._resolve_sheet_image_link(image, article_id=42)
+
+
+def test_resolve_sheet_image_link_uploads_data_url_for_sheets(monkeypatch):
+    image = SimpleNamespace(id=9, image_url="data:image/png;base64,abc")
+    monkeypatch.setattr(google_sheets, "_get_pcloud_config", lambda: PCloudConfig(auth_token="token", folder_id=123))
+    monkeypatch.setattr(
+        google_sheets,
+        "upload_data_url_to_pcloud",
+        lambda config, data_url, article_id, image_id: "https://public.example.com/article/generated.png",
+    )
+
+    url = google_sheets._resolve_sheet_image_link(image, article_id=42)
+
+    assert url == "https://public.example.com/article/generated.png"
+    assert image.image_url == "https://public.example.com/article/generated.png"

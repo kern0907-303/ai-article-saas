@@ -79,6 +79,32 @@ def _persist_image_url(image_url: str, *, article_id: int, image_id: int) -> str
     return image_url
 
 
+def _ensure_public_image_link(record: ArticleImage, *, article_id: int) -> str:
+    image_url = (record.image_url or "").strip()
+    if image_url.startswith(("http://", "https://")):
+        return image_url
+    if not image_url.startswith("data:image/"):
+        raise HTTPException(status_code=400, detail="這張圖片沒有可上傳的圖片資料")
+
+    pcloud_config = _get_pcloud_config()
+    if not pcloud_config.enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="尚未設定 pCloud。請設定 PCLOUD_AUTH_TOKEN + PCLOUD_FOLDER_ID/PCLOUD_FOLDER_PATH，或 PCLOUD_PUBLIC_FOLDER_PATH + PCLOUD_PUBLIC_BASE_URL。",
+        )
+
+    public_url = upload_data_url_to_pcloud(pcloud_config, data_url=image_url, article_id=article_id, image_id=record.id)
+    if not public_url.startswith(("http://", "https://")):
+        raise HTTPException(
+            status_code=400,
+            detail="圖片已存到 pCloud 資料夾，但尚未產生公開網址。請設定 PCLOUD_PUBLIC_BASE_URL，或改用 pCloud API 公開連結設定。",
+        )
+
+    record.image_url = public_url
+    record.generation_error = None
+    return public_url
+
+
 def _generate_images_in_background(
     *,
     image_ids: list[int],
@@ -318,6 +344,48 @@ def regenerate_article_image(
     db.refresh(record)
     consume_feature_usage(db, int(user_id), feature="image_generate", amount=1)
     log_audit(db, action="images.regenerate", user_id=user_id, metadata={"image_id": record.id})
+    return record
+
+
+@router.post("/article-images/{image_id}/upload-pcloud", response_model=ArticleImageOut)
+def upload_article_image_to_pcloud(
+    image_id: int,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+    _: object = Depends(require_active_subscription),
+):
+    record = db.query(ArticleImage).filter(ArticleImage.id == image_id, ArticleImage.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="找不到圖片")
+    article = db.query(Article).filter(Article.id == record.article_id, Article.user_id == user_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="找不到圖片對應文章")
+
+    _ensure_public_image_link(record, article_id=article.id)
+    db.commit()
+    db.refresh(record)
+    log_audit(db, action="images.upload_pcloud", user_id=user_id, metadata={"image_id": record.id})
+    return record
+
+
+@router.post("/article-images/{image_id}/public-link", response_model=ArticleImageOut)
+def create_article_image_public_link(
+    image_id: int,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+    _: object = Depends(require_active_subscription),
+):
+    record = db.query(ArticleImage).filter(ArticleImage.id == image_id, ArticleImage.user_id == user_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="找不到圖片")
+    article = db.query(Article).filter(Article.id == record.article_id, Article.user_id == user_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="找不到圖片對應文章")
+
+    _ensure_public_image_link(record, article_id=article.id)
+    db.commit()
+    db.refresh(record)
+    log_audit(db, action="images.public_link", user_id=user_id, metadata={"image_id": record.id})
     return record
 
 

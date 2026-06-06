@@ -138,6 +138,7 @@ export default function ArticlesPage() {
   const [pollingArticleId, setPollingArticleId] = useState<number | null>(null);
   const [pollingImageArticleId, setPollingImageArticleId] = useState<number | null>(null);
   const [draftHydrated, setDraftHydrated] = useState(false);
+  const [imageActionKey, setImageActionKey] = useState<string | null>(null);
 
   const currentArticle = useMemo(
     () => articles.find((item) => item.id === currentArticleId) || null,
@@ -410,6 +411,43 @@ export default function ArticlesPage() {
     } catch {
       window.open(image.image_url, "_blank", "noopener,noreferrer");
       setStatus("瀏覽器已開啟圖片，若未自動下載請在圖片上按右鍵另存");
+    }
+  };
+
+  const updateImageRecord = (updated: ArticleImage) => {
+    setImages((prev) => prev.map((image) => (image.id === updated.id ? updated : image)));
+  };
+
+  const uploadImageToPcloud = async (image: ArticleImage) => {
+    setImageActionKey(`upload-${image.id}`);
+    setStatus("圖片上傳 pCloud 中...");
+    try {
+      const updated = await api.uploadArticleImageToPcloud(image.id);
+      updateImageRecord(updated);
+      setStatus("圖片已上傳 pCloud，並取得公開連結");
+    } catch (err) {
+      setStatus(`圖片上傳 pCloud 失敗：${(err as Error).message}`);
+    } finally {
+      setImageActionKey(null);
+    }
+  };
+
+  const createImagePublicLink = async (image: ArticleImage) => {
+    setImageActionKey(`link-${image.id}`);
+    setStatus("產生圖片連結中...");
+    try {
+      const updated = await api.createArticleImagePublicLink(image.id);
+      updateImageRecord(updated);
+      if (updated.image_url.startsWith("http://") || updated.image_url.startsWith("https://")) {
+        await navigator.clipboard?.writeText(updated.image_url);
+        setStatus("圖片公開連結已產生並複製");
+      } else {
+        setStatus("圖片已處理，但尚未取得公開網址");
+      }
+    } catch (err) {
+      setStatus(`產生圖片連結失敗：${(err as Error).message}`);
+    } finally {
+      setImageActionKey(null);
     }
   };
 
@@ -835,13 +873,31 @@ export default function ArticlesPage() {
                   size: {image.width}x{image.height}
                 </p>
                 {image.image_url && (
-                  <button
-                    type="button"
-                    onClick={() => downloadImage(image)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    下載圖片
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => downloadImage(image)}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      下載圖片
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => uploadImageToPcloud(image)}
+                      disabled={imageActionKey !== null || !image.image_url.startsWith("data:image/")}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {imageActionKey === `upload-${image.id}` ? "上傳中..." : "上傳 pCloud"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => createImagePublicLink(image)}
+                      disabled={imageActionKey !== null}
+                      className="rounded-lg border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {imageActionKey === `link-${image.id}` ? "產生中..." : "產生圖片連結"}
+                    </button>
+                  </div>
                 )}
                 <label
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${

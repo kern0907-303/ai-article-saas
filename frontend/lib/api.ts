@@ -191,6 +191,10 @@ export const api = {
     },
   ) => request<ArticleImage[]>(`/articles/${articleId}/generate-images`, { method: "POST", body: JSON.stringify(payload) }),
   listArticleImages: (articleId: number) => request<ArticleImage[]>(`/articles/${articleId}/images`),
+  uploadArticleImageToPcloud: (imageId: number) =>
+    request<ArticleImage>(`/article-images/${imageId}/upload-pcloud`, { method: "POST" }),
+  createArticleImagePublicLink: (imageId: number) =>
+    request<ArticleImage>(`/article-images/${imageId}/public-link`, { method: "POST" }),
   exportArticleToGoogleSheets: (
     articleId: number,
     destinationId?: number,

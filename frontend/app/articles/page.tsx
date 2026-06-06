@@ -558,7 +558,7 @@ export default function ArticlesPage() {
               >
                 {sizePresets.map((preset) => (
                   <option key={preset.key} value={preset.key}>
-                    {preset.label}（社群 {preset.size} / 生成 {preset.generation_size}）
+                    {preset.label}（{preset.size}）
                   </option>
                 ))}
               </select>

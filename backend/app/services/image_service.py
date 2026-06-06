@@ -33,45 +33,40 @@ IMAGE_SIZE_PRESETS: list[dict[str, str | int]] = [
     {
         "key": "instagram_square",
         "label": "Instagram 方形貼文",
-        "description": "適合 IG 貼文、Facebook 方形素材",
-        "size": "1080x1080",
-        "generation_size": "1024x1024",
-        "width": 1080,
-        "height": 1080,
+        "description": "依方形貼文比例調整為 OpenAI 可生成尺寸",
+        "size": "1024x1024",
+        "width": 1024,
+        "height": 1024,
     },
     {
         "key": "instagram_story",
         "label": "Instagram Story / Reels",
-        "description": "適合限時動態、Reels、TikTok 直式素材",
-        "size": "1080x1920",
-        "generation_size": "1024x1536",
-        "width": 1080,
-        "height": 1920,
+        "description": "依限時動態、Reels、TikTok 直式比例調整為 OpenAI 可生成尺寸",
+        "size": "1024x1536",
+        "width": 1024,
+        "height": 1536,
     },
     {
         "key": "facebook_link",
         "label": "Facebook / LinkedIn 連結圖",
-        "description": "適合橫式連結預覽與商務社群分享",
-        "size": "1200x630",
-        "generation_size": "1536x1024",
-        "width": 1200,
-        "height": 630,
+        "description": "依橫式連結預覽比例調整為 OpenAI 可生成尺寸",
+        "size": "1536x1024",
+        "width": 1536,
+        "height": 1024,
     },
     {
         "key": "x_landscape",
         "label": "X / Twitter 橫式圖",
-        "description": "適合寬版社群貼文與摘要卡片",
-        "size": "1600x900",
-        "generation_size": "1536x1024",
-        "width": 1600,
-        "height": 900,
+        "description": "依寬版社群貼文比例調整為 OpenAI 可生成尺寸",
+        "size": "1536x1024",
+        "width": 1536,
+        "height": 1024,
     },
     {
         "key": "blog_cover",
         "label": "部落格封面",
         "description": "適合網站文章首圖與一般橫式封面",
         "size": "1536x1024",
-        "generation_size": "1536x1024",
         "width": 1536,
         "height": 1024,
     },
@@ -93,7 +88,7 @@ def resolve_size(size: str | None, fallback_size: str) -> str:
     requested = (size or "").strip()
     preset = next((item for item in IMAGE_SIZE_PRESETS if item["key"] == requested), None)
     if preset:
-        return str(preset["generation_size"])
+        return str(preset["size"])
     if requested:
         width, height = parse_size(requested)
         return resolve_openai_gpt_image_size(f"{width}x{height}")
@@ -410,7 +405,7 @@ def generate_image_plan(
     openai_api_key: str | None = None,
     output_size: str | None = None,
 ) -> list[dict[str, Any]]:
-    requested_size = resolve_size(output_size, getattr(setting, "default_size", "1080x1080"))
+    requested_size = resolve_size(output_size, getattr(setting, "default_size", "1024x1024"))
     width, height = parse_size(requested_size)
     output_format = resolve_output_format(getattr(setting, "output_format", "png"))
     quality = resolve_quality(getattr(setting, "default_quality", "high"))

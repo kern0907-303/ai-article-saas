@@ -89,7 +89,6 @@ export type ImageSizePreset = {
   label: string;
   description: string;
   size: string;
-  generation_size: string;
   width: number;
   height: number;
 };

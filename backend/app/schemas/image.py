@@ -9,7 +9,7 @@ class ImageSettingsBase(BaseModel):
     force_nano_banana_for_zh_text: bool = True
     nano_banana_model: str = "nano-banana-pro"
     openai_image_model: str = "gpt-image-1.5"
-    default_size: str = "1080x1080"
+    default_size: str = "1024x1024"
     default_quality: str = "high"
     output_format: str = "png"
     images_per_article: int = Field(default=1, ge=1, le=5)
@@ -40,7 +40,6 @@ class ImageSizePresetOut(BaseModel):
     label: str
     description: str
     size: str
-    generation_size: str
     width: int
     height: int
 

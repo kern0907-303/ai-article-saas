@@ -35,9 +35,10 @@ def test_social_image_size_presets_are_named_for_platforms():
     }.issubset(preset_keys)
 
     sizes = {preset["key"]: preset["size"] for preset in IMAGE_SIZE_PRESETS}
-    assert parse_size(sizes["instagram_square"]) == (1080, 1080)
-    assert parse_size(sizes["instagram_story"]) == (1080, 1920)
-    assert parse_size(sizes["facebook_link"]) == (1200, 630)
+    assert parse_size(sizes["instagram_square"]) == (1024, 1024)
+    assert parse_size(sizes["instagram_story"]) == (1024, 1536)
+    assert parse_size(sizes["facebook_link"]) == (1536, 1024)
+    assert parse_size(sizes["x_landscape"]) == (1536, 1024)
 
 
 def test_social_image_presets_resolve_to_gpt_image_supported_sizes():

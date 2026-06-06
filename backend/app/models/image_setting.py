@@ -18,7 +18,7 @@ class ImageSetting(BaseModel):
     nano_banana_model: Mapped[str] = mapped_column(String(100), default="nano-banana-pro")
     openai_image_model: Mapped[str] = mapped_column(String(100), default="gpt-image-1.5")
 
-    default_size: Mapped[str] = mapped_column(String(32), default="1080x1080")
+    default_size: Mapped[str] = mapped_column(String(32), default="1024x1024")
     default_quality: Mapped[str] = mapped_column(String(32), default="high")
     output_format: Mapped[str] = mapped_column(String(16), default="png")
     images_per_article: Mapped[int] = mapped_column(Integer, default=1)

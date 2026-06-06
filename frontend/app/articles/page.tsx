@@ -41,6 +41,11 @@ const PROMPT_TEMPLATES = [
   },
 ];
 
+const isPublicSheetImage = (image: ArticleImage) =>
+  image.status === "generated" &&
+  !!image.image_url &&
+  (image.image_url.startsWith("http://") || image.image_url.startsWith("https://"));
+
 export default function ArticlesPage() {
   const [files, setFiles] = useState<KnowledgeFile[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -55,6 +60,8 @@ export default function ArticlesPage() {
   const [needTextOverlay, setNeedTextOverlay] = useState(true);
   const [imageTextLanguage, setImageTextLanguage] = useState("zh-Hant");
   const [imageTextContent, setImageTextContent] = useState("");
+  const [selectedSheetImageIds, setSelectedSheetImageIds] = useState<number[]>([]);
+  const [imageSelectionTouched, setImageSelectionTouched] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [topic, setTopic] = useState("");
@@ -78,6 +85,25 @@ export default function ArticlesPage() {
     () => articles.find((item) => item.id === currentArticleId) || null,
     [articles, currentArticleId],
   );
+  const publicSheetImages = useMemo(() => images.filter(isPublicSheetImage), [images]);
+  const selectedSheetImageLinks = useMemo(
+    () =>
+      publicSheetImages
+        .filter((image) => selectedSheetImageIds.includes(image.id))
+        .map((image) => image.image_url)
+        .filter(Boolean),
+    [publicSheetImages, selectedSheetImageIds],
+  );
+
+  useEffect(() => {
+    const publicIds = publicSheetImages.map((image) => image.id);
+    setSelectedSheetImageIds((prev) => (imageSelectionTouched ? prev.filter((id) => publicIds.includes(id)) : publicIds));
+  }, [imageSelectionTouched, publicSheetImages]);
+
+  useEffect(() => {
+    setImageSelectionTouched(false);
+    setSelectedSheetImageIds([]);
+  }, [currentArticleId]);
 
   const load = async () => {
     const [presets, sizes, sheets, entitlementData] = await Promise.all([
@@ -218,6 +244,11 @@ export default function ArticlesPage() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
+  const toggleSheetImage = (id: number) => {
+    setImageSelectionTouched(true);
+    setSelectedSheetImageIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
   const onSelectTemplate = (value: string) => {
     setTemplateKey(value);
     const selected = PROMPT_TEMPLATES.find((template) => template.key === value);
@@ -296,6 +327,7 @@ export default function ArticlesPage() {
         text_language: imageTextLanguage,
         text_content: imageTextContent || topic,
       });
+      setImageSelectionTouched(false);
       setImages(result);
       setStatus("已加入圖片生成佇列，等待處理中...");
       setPollingImageArticleId(currentArticleId);
@@ -364,9 +396,8 @@ export default function ArticlesPage() {
         fallback_content: content,
         fallback_generation_model: currentArticle?.generation_model || "",
         fallback_generation_status: currentArticle?.generation_status || "generated",
-        fallback_image_links: images
-          .map((image) => image.image_url)
-          .filter((url) => url.startsWith("http://") || url.startsWith("https://")),
+        fallback_image_links: selectedSheetImageLinks,
+        selected_image_ids: selectedSheetImageIds,
       });
       setStatus(`${result.message}：${result.destination_label} / ${result.updated_range || result.sheet_name}`);
     } catch (err) {
@@ -639,6 +670,26 @@ export default function ArticlesPage() {
                   {" / "}
                   size: {image.width}x{image.height}
                 </p>
+                <label
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+                    isPublicSheetImage(image)
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                      : "border-slate-200 bg-slate-50 text-slate-500"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                    checked={selectedSheetImageIds.includes(image.id)}
+                    disabled={!isPublicSheetImage(image)}
+                    onChange={() => toggleSheetImage(image.id)}
+                  />
+                  <span>
+                    {isPublicSheetImage(image)
+                      ? "上傳此圖片連結到 Google Sheets"
+                      : "尚無公開圖片連結，無法上傳到 Google Sheets"}
+                  </span>
+                </label>
                 {image.provider === "nano_banana" && (
                   <p className="text-xs text-slate-500">這張是預覽 mock 圖，用來確認構圖與文案位置。</p>
                 )}
@@ -671,6 +722,11 @@ export default function ArticlesPage() {
           >
             {exportingSheet ? "上傳中..." : "上傳到 Google Sheets"}
           </button>
+          {publicSheetImages.length > 0 && (
+            <p className="self-end pb-2 text-xs text-slate-600">
+              已勾選 {selectedSheetImageLinks.length} / {publicSheetImages.length} 張圖片連結
+            </p>
+          )}
           <button
             onClick={() => publish("website")}
             className="brand-btn self-end px-4 py-2"

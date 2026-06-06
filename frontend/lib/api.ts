@@ -201,6 +201,7 @@ export const api = {
       fallback_generation_model?: string;
       fallback_generation_status?: string;
       fallback_image_links?: string[];
+      selected_image_ids?: number[];
     },
   ) =>
     request<GoogleSheetExportResponse>(`/articles/${articleId}/export/google-sheets`, {

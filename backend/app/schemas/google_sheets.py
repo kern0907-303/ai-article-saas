@@ -36,6 +36,7 @@ class ExportArticleToSheetRequest(BaseModel):
     fallback_generation_model: str | None = None
     fallback_generation_status: str | None = None
     fallback_image_links: list[str] | None = None
+    selected_image_ids: list[int] | None = None
 
 
 class ExportArticleToSheetResponse(BaseModel):

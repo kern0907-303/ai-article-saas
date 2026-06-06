@@ -31,6 +31,17 @@ def _default_storage_dir() -> Path:
     return _default_runtime_root() / "storage"
 
 
+def _default_pcloud_public_folder_path() -> str | None:
+    configured = os.getenv("PCLOUD_PUBLIC_FOLDER_PATH")
+    if configured is not None:
+        return configured.strip() or None
+
+    default_path = Path("/Users/erickair/pCloud Drive/Public Folder/article")
+    if default_path.exists() or default_path.parent.exists():
+        return str(default_path)
+    return None
+
+
 class AppSettings(BaseSettings):
     app_name: str = "AI 文章生成與自動發布 SaaS API"
     api_prefix: str = "/api"
@@ -53,7 +64,7 @@ class AppSettings(BaseSettings):
     pcloud_api_host: str = "api.pcloud.com"
     pcloud_folder_id: int | None = None
     pcloud_folder_path: str | None = None
-    pcloud_public_folder_path: str | None = None
+    pcloud_public_folder_path: str | None = _default_pcloud_public_folder_path()
     pcloud_public_base_url: str | None = None
     pcloud_create_public_link: bool = True
     pcloud_use_direct_download_link: bool = True

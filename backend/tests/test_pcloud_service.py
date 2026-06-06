@@ -1,5 +1,6 @@
 import base64
 
+from app.core.config import _default_pcloud_public_folder_path
 from app.services import pcloud_service
 from app.services.pcloud_service import PCloudConfig, decode_data_url, upload_data_url_to_pcloud
 
@@ -104,3 +105,9 @@ def test_upload_data_url_to_pcloud_saves_to_local_public_folder(tmp_path):
     assert len(saved_files) == 1
     assert saved_files[0].read_bytes() == b"image-bytes"
     assert url.startswith("https://public.example.com/article/article-7-image-9-")
+
+
+def test_default_pcloud_public_folder_path_uses_env_when_configured(monkeypatch, tmp_path):
+    monkeypatch.setenv("PCLOUD_PUBLIC_FOLDER_PATH", str(tmp_path))
+
+    assert _default_pcloud_public_folder_path() == str(tmp_path)

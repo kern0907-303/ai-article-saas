@@ -193,16 +193,22 @@ def export_article_to_google_sheets(
         raise HTTPException(status_code=400, detail="Google Sheets Service Account JSON 無法解密，請重新儲存目的地")
 
     if isinstance(article, Article):
-        image_links = [
-            image.image_url
-            for image in (
-                db.query(ArticleImage)
-                .filter(ArticleImage.article_id == article.id, ArticleImage.user_id == user_id, ArticleImage.status == "generated")
-                .order_by(ArticleImage.updated_at.desc())
-                .all()
+        image_links = []
+        if payload.selected_image_ids != []:
+            image_query = db.query(ArticleImage).filter(
+                ArticleImage.article_id == article.id,
+                ArticleImage.user_id == user_id,
+                ArticleImage.status == "generated",
             )
-            if image.image_url
-        ]
+            if payload.selected_image_ids is not None:
+                image_query = image_query.filter(ArticleImage.id.in_(payload.selected_image_ids))
+            image_links = [
+                image.image_url
+                for image in image_query.order_by(ArticleImage.updated_at.desc()).all()
+                if image.image_url
+            ]
+        if payload.selected_image_ids not in (None, []) and not image_links:
+            image_links = payload.fallback_image_links or []
     else:
         image_links = payload.fallback_image_links or []
     rows = build_article_sheet_rows(article, destination_label=destination.label, image_links=image_links)

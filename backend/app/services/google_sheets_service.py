@@ -73,21 +73,15 @@ def split_article_content_for_sheet(content: str) -> list[str]:
 
 def normalize_sheet_image_links(image_links: list[str] | None) -> list[str]:
     normalized: list[str] = []
-    skipped_embedded_images = 0
     for link in image_links or []:
         cleaned = str(link or "").strip()
         if not cleaned:
             continue
-        if cleaned.startswith("data:image/"):
-            skipped_embedded_images += 1
+        if not cleaned.startswith(("http://", "https://")):
             continue
         if len(cleaned) > GOOGLE_SHEETS_CELL_LIMIT:
-            normalized.append(OVERSIZED_CELL_PLACEHOLDER)
             continue
         normalized.append(cleaned)
-
-    if skipped_embedded_images:
-        normalized.append(f"{skipped_embedded_images} 張圖片已生成，但尚未上傳成公開連結")
     return normalized
 
 

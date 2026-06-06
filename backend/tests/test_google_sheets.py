@@ -85,19 +85,20 @@ def test_build_article_sheet_rows_splits_long_content_for_google_cell_limit():
     assert rows[0][2] == rows[1][2] == 42
 
 
-def test_build_article_sheet_row_skips_embedded_base64_image_data():
+def test_build_article_sheet_row_only_exports_public_image_links():
     row = build_article_sheet_row(
         ArticleStub(),
         destination_label="客戶 A",
         image_links=[
             f"data:image/png;base64,{'A' * 60000}",
+            "/local/path/image.png",
             "https://public.example.com/article/cover.png",
         ],
     )
 
     assert "data:image" not in row[10]
+    assert "/local/path" not in row[10]
     assert "https://public.example.com/article/cover.png" in row[10]
-    assert "1 張圖片已生成" in row[10]
     assert len(row[10]) < GOOGLE_SHEETS_CELL_LIMIT
 
 

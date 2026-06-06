@@ -62,6 +62,147 @@ const FALLBACK_IMAGE_MODELS: ModelCatalogItem[] = [
   { key: "nano-banana-pro", provider: "nano_banana", category: "image", label: "Nano Banana Pro", description: "", cost_tier: "medium" },
 ];
 
+const SETTINGS_BACKUP_KEY = "ai_article_saas_settings_backup_v1";
+const SHEET_DESTINATIONS_BACKUP_KEY = "ai_article_saas_google_sheet_destinations_backup_v1";
+
+type SettingsFormState = {
+  ai_provider: Settings["ai_provider"];
+  openai_api_key: string;
+  anthropic_api_key: string;
+  gemini_api_key: string;
+  github_api_key: string;
+  website_api_key: string;
+  social_api_key: string;
+  article_model: string;
+  prompt_model: string;
+  image_model: string;
+  website_endpoint: string;
+  social_endpoint: string;
+  notes: string;
+};
+
+type SheetFormState = {
+  id: number | null;
+  label: string;
+  spreadsheet_id: string;
+  sheet_name: string;
+  service_account_json: string;
+  is_default: boolean;
+};
+
+type SheetDestinationBackup = {
+  label: string;
+  spreadsheet_id: string;
+  sheet_name: string;
+  service_account_json: string;
+  is_default: boolean;
+  updated_at: string;
+};
+
+const DEFAULT_SETTINGS_FORM: SettingsFormState = {
+  ai_provider: "openai",
+  openai_api_key: "",
+  anthropic_api_key: "",
+  gemini_api_key: "",
+  github_api_key: "",
+  website_api_key: "",
+  social_api_key: "",
+  article_model: "gpt-5.4-mini",
+  prompt_model: "gpt-5.4-mini",
+  image_model: "gpt-image-1.5",
+  website_endpoint: "",
+  social_endpoint: "",
+  notes: "",
+};
+
+const DEFAULT_SHEET_FORM: SheetFormState = {
+  id: null,
+  label: "",
+  spreadsheet_id: "",
+  sheet_name: "文章準備",
+  service_account_json: "",
+  is_default: false,
+};
+
+function readLocalJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeLocalJson<T>(key: string, value: T) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function settingsFromApi(settingsData: Settings): SettingsFormState {
+  return {
+    ai_provider: settingsData.ai_provider || "openai",
+    openai_api_key: settingsData.openai_api_key || "",
+    anthropic_api_key: settingsData.anthropic_api_key || "",
+    gemini_api_key: settingsData.gemini_api_key || "",
+    github_api_key: settingsData.github_api_key || "",
+    website_api_key: settingsData.website_api_key || "",
+    social_api_key: settingsData.social_api_key || "",
+    article_model: settingsData.article_model || "gpt-5.4-mini",
+    prompt_model: settingsData.prompt_model || "gpt-5.4-mini",
+    image_model: settingsData.image_model || "gpt-image-1.5",
+    website_endpoint: settingsData.website_endpoint || "",
+    social_endpoint: settingsData.social_endpoint || "",
+    notes: settingsData.notes || "",
+  };
+}
+
+function readSettingsBackup(): SettingsFormState | null {
+  const backup = readLocalJson<Partial<SettingsFormState> | null>(SETTINGS_BACKUP_KEY, null);
+  if (!backup) return null;
+  return { ...DEFAULT_SETTINGS_FORM, ...backup };
+}
+
+function backupSettings(form: SettingsFormState) {
+  writeLocalJson(SETTINGS_BACKUP_KEY, form);
+}
+
+function readSheetBackups(): SheetDestinationBackup[] {
+  return readLocalJson<SheetDestinationBackup[]>(SHEET_DESTINATIONS_BACKUP_KEY, []).filter(
+    (item) => item.label && item.spreadsheet_id && item.sheet_name && item.service_account_json,
+  );
+}
+
+function backupSheetDestination(form: SheetFormState) {
+  const serviceAccountJson = form.service_account_json.trim();
+  const existing = readSheetBackups();
+  const nextItem: SheetDestinationBackup = {
+    label: form.label.trim(),
+    spreadsheet_id: form.spreadsheet_id.trim(),
+    sheet_name: form.sheet_name.trim(),
+    service_account_json:
+      serviceAccountJson ||
+      existing.find((item) => item.label === form.label.trim() || item.spreadsheet_id === form.spreadsheet_id.trim())?.service_account_json ||
+      "",
+    is_default: form.is_default,
+    updated_at: new Date().toISOString(),
+  };
+  if (!nextItem.service_account_json) return;
+
+  const next = [
+    nextItem,
+    ...existing.filter((item) => item.label !== nextItem.label && item.spreadsheet_id !== nextItem.spreadsheet_id),
+  ].map((item) => (nextItem.is_default && item.label !== nextItem.label ? { ...item, is_default: false } : item));
+  writeLocalJson(SHEET_DESTINATIONS_BACKUP_KEY, next);
+}
+
+function removeSheetDestinationBackup(destination: GoogleSheetDestination) {
+  const next = readSheetBackups().filter(
+    (item) => item.label !== destination.label && item.spreadsheet_id !== destination.spreadsheet_id,
+  );
+  writeLocalJson(SHEET_DESTINATIONS_BACKUP_KEY, next);
+}
+
 function getActiveProviderKey(form: {
   ai_provider: Settings["ai_provider"];
   openai_api_key: string;
@@ -97,31 +238,10 @@ function validateProviderKey(provider: Settings["ai_provider"], apiKey: string):
 }
 
 export default function SettingsPage() {
-  const [form, setForm] = useState({
-    ai_provider: "openai" as Settings["ai_provider"],
-    openai_api_key: "",
-    anthropic_api_key: "",
-    gemini_api_key: "",
-    github_api_key: "",
-    website_api_key: "",
-    social_api_key: "",
-    article_model: "gpt-5.4-mini",
-    prompt_model: "gpt-5.4-mini",
-    image_model: "gpt-image-1.5",
-    website_endpoint: "",
-    social_endpoint: "",
-    notes: "",
-  });
+  const [form, setForm] = useState<SettingsFormState>(DEFAULT_SETTINGS_FORM);
   const [modelCatalog, setModelCatalog] = useState<ModelCatalogItem[]>([]);
   const [sheetDestinations, setSheetDestinations] = useState<GoogleSheetDestination[]>([]);
-  const [sheetForm, setSheetForm] = useState({
-    id: null as number | null,
-    label: "",
-    spreadsheet_id: "",
-    sheet_name: "文章準備",
-    service_account_json: "",
-    is_default: false,
-  });
+  const [sheetForm, setSheetForm] = useState<SheetFormState>(DEFAULT_SHEET_FORM);
   const [status, setStatus] = useState("");
   const [sheetStatus, setSheetStatus] = useState("");
   const [showAdvancedPublish, setShowAdvancedPublish] = useState(false);
@@ -131,26 +251,36 @@ export default function SettingsPage() {
 
     api
       .getSettings()
-      .then((settingsData) => {
-        if (!mounted || !settingsData) return;
-        setForm({
-          ai_provider: settingsData.ai_provider || "openai",
-          openai_api_key: settingsData.openai_api_key || "",
-          anthropic_api_key: settingsData.anthropic_api_key || "",
-          gemini_api_key: settingsData.gemini_api_key || "",
-          github_api_key: settingsData.github_api_key || "",
-          website_api_key: settingsData.website_api_key || "",
-          social_api_key: settingsData.social_api_key || "",
-          article_model: settingsData.article_model || "gpt-5.4-mini",
-          prompt_model: settingsData.prompt_model || "gpt-5.4-mini",
-          image_model: settingsData.image_model || "gpt-image-1.5",
-          website_endpoint: settingsData.website_endpoint || "",
-          social_endpoint: settingsData.social_endpoint || "",
-          notes: settingsData.notes || "",
-        });
+      .then(async (settingsData) => {
+        if (!mounted) return;
+        if (settingsData) {
+          const nextForm = settingsFromApi(settingsData);
+          setForm(nextForm);
+          backupSettings(nextForm);
+          return;
+        }
+
+        const backup = readSettingsBackup();
+        if (!backup) return;
+        setForm(backup);
+        setStatus("後端設定為空，已從本機備份帶回，正在同步回後端...");
+        try {
+          await api.saveSettings(backup);
+          if (!mounted) return;
+          setStatus("後端設定曾清空，已用本機備份自動同步回後端。");
+        } catch (err) {
+          if (!mounted) return;
+          setStatus(`已從本機備份帶回設定，但同步後端失敗：${(err as Error).message}`);
+        }
       })
       .catch((err: Error) => {
         if (!mounted) return;
+        const backup = readSettingsBackup();
+        if (backup) {
+          setForm(backup);
+          setStatus(`後端設定讀取失敗，已先從本機備份帶回：${err.message}`);
+          return;
+        }
         setStatus(`部分設定讀取失敗：${err.message}`);
       });
 
@@ -167,8 +297,33 @@ export default function SettingsPage() {
 
     api
       .listGoogleSheetDestinations()
-      .then((items) => {
+      .then(async (items) => {
         if (!mounted) return;
+        if (items.length === 0) {
+          const backups = readSheetBackups();
+          if (backups.length > 0) {
+            setSheetStatus("後端 Google Sheets 目的地為空，正在用本機備份重建...");
+            try {
+              for (const backup of backups) {
+                await api.createGoogleSheetDestination({
+                  label: backup.label,
+                  spreadsheet_id: backup.spreadsheet_id,
+                  sheet_name: backup.sheet_name,
+                  service_account_json: backup.service_account_json,
+                  is_default: backup.is_default,
+                });
+              }
+              const restored = await api.listGoogleSheetDestinations();
+              if (!mounted) return;
+              setSheetDestinations(restored);
+              setSheetStatus("Google Sheets 目的地曾清空，已用本機備份自動重建。");
+              return;
+            } catch (err) {
+              if (!mounted) return;
+              setSheetStatus(`已找到本機備份，但重建 Google Sheets 目的地失敗：${(err as Error).message}`);
+            }
+          }
+        }
         setSheetDestinations(items);
       })
       .catch((err: Error) => {
@@ -217,6 +372,7 @@ export default function SettingsPage() {
     setStatus("儲存中...");
     try {
       await api.saveSettings(form);
+      backupSettings(form);
       setStatus("儲存成功，現在可前往「文章創作與發布」測試。 ");
     } catch (err) {
       setStatus(`儲存失敗：${(err as Error).message}`);
@@ -224,14 +380,7 @@ export default function SettingsPage() {
   };
 
   const resetSheetForm = () => {
-    setSheetForm({
-      id: null,
-      label: "",
-      spreadsheet_id: "",
-      sheet_name: "文章準備",
-      service_account_json: "",
-      is_default: false,
-    });
+    setSheetForm(DEFAULT_SHEET_FORM);
   };
 
   const refreshSheetDestinations = async () => {
@@ -263,6 +412,7 @@ export default function SettingsPage() {
       } else {
         await api.createGoogleSheetDestination({ ...payload, service_account_json: sheetForm.service_account_json.trim() });
       }
+      backupSheetDestination(sheetForm);
       await refreshSheetDestinations();
       resetSheetForm();
       setSheetStatus("Google Sheets 目的地已儲存");
@@ -272,15 +422,22 @@ export default function SettingsPage() {
   };
 
   const editSheetDestination = (destination: GoogleSheetDestination) => {
+    const backup = readSheetBackups().find(
+      (item) => item.label === destination.label || item.spreadsheet_id === destination.spreadsheet_id,
+    );
     setSheetForm({
       id: destination.id,
       label: destination.label,
       spreadsheet_id: destination.spreadsheet_id,
       sheet_name: destination.sheet_name,
-      service_account_json: "",
+      service_account_json: backup?.service_account_json || "",
       is_default: destination.is_default,
     });
-    setSheetStatus("正在編輯目的地。若不更換 Service Account，JSON 欄位可留空。");
+    setSheetStatus(
+      backup?.service_account_json
+        ? "正在編輯目的地，已從本機備份帶入 Service Account JSON。"
+        : "正在編輯目的地。若不更換 Service Account，JSON 欄位可留空。",
+    );
   };
 
   const deleteSheetDestination = async (destination: GoogleSheetDestination) => {
@@ -289,6 +446,7 @@ export default function SettingsPage() {
     setSheetStatus("刪除 Google Sheets 目的地中...");
     try {
       await api.deleteGoogleSheetDestination(destination.id);
+      removeSheetDestinationBackup(destination);
       await refreshSheetDestinations();
       if (sheetForm.id === destination.id) resetSheetForm();
       setSheetStatus("Google Sheets 目的地已刪除");
@@ -305,6 +463,9 @@ export default function SettingsPage() {
           <span className="brand-pill">降低設定門檻</span>
         </div>
         <p className="text-slate-700">請先完成下面 3 步，整個平台就能正常生成、配圖與發布。</p>
+        <p className="text-sm text-slate-600">
+          儲存後會同步保留本機備份；若後端資料被部署或重啟清空，設定頁會自動帶回並重新同步。
+        </p>
         <p className="text-sm text-slate-500">
           不確定怎麼做？
           <Link href="/help/api-setup" className="ml-1 brand-link">

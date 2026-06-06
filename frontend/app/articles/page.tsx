@@ -358,7 +358,16 @@ export default function ArticlesPage() {
     setStatus("上傳 Google Sheets 中...");
     setExportingSheet(true);
     try {
-      const result = await api.exportArticleToGoogleSheets(currentArticleId, selectedSheetDestinationId || undefined);
+      const result = await api.exportArticleToGoogleSheets(currentArticleId, selectedSheetDestinationId || undefined, {
+        fallback_topic: currentArticle?.topic || topic || "未命名文章",
+        fallback_outline: currentArticle?.outline || outline || "",
+        fallback_content: content,
+        fallback_generation_model: currentArticle?.generation_model || "",
+        fallback_generation_status: currentArticle?.generation_status || "generated",
+        fallback_image_links: images
+          .map((image) => image.image_url)
+          .filter((url) => url.startsWith("http://") || url.startsWith("https://")),
+      });
       setStatus(`${result.message}：${result.destination_label} / ${result.updated_range || result.sheet_name}`);
     } catch (err) {
       setStatus(`上傳 Google Sheets 失敗：${(err as Error).message}`);

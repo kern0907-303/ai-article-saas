@@ -30,6 +30,12 @@ class GoogleSheetDestinationOut(GoogleSheetDestinationBase):
 
 class ExportArticleToSheetRequest(BaseModel):
     destination_id: int | None = None
+    fallback_topic: str | None = None
+    fallback_outline: str | None = None
+    fallback_content: str | None = None
+    fallback_generation_model: str | None = None
+    fallback_generation_status: str | None = None
+    fallback_image_links: list[str] | None = None
 
 
 class ExportArticleToSheetResponse(BaseModel):

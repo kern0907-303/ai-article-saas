@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -159,8 +161,20 @@ def export_article_to_google_sheets(
     user_id: str = Depends(get_current_user_id),
 ):
     article = db.query(Article).filter(Article.id == article_id, Article.user_id == user_id).first()
+    if not article and payload.fallback_content:
+        article = SimpleNamespace(
+            id=article_id,
+            topic=payload.fallback_topic or "未命名文章",
+            outline=payload.fallback_outline or "",
+            content=payload.fallback_content,
+            generation_model=payload.fallback_generation_model or "",
+            generation_status=payload.fallback_generation_status or "generated",
+            published_to_website=False,
+            published_to_social=False,
+            updated_at=None,
+        )
     if not article:
-        raise HTTPException(status_code=404, detail="找不到文章")
+        raise HTTPException(status_code=404, detail="找不到文章，且畫面沒有可備援上傳的文章內容")
     if not article.content:
         raise HTTPException(status_code=400, detail="文章內容為空，無法上傳到 Google Sheets")
 
@@ -178,16 +192,19 @@ def export_article_to_google_sheets(
     if not service_account_json:
         raise HTTPException(status_code=400, detail="Google Sheets Service Account JSON 無法解密，請重新儲存目的地")
 
-    image_links = [
-        image.image_url
-        for image in (
-            db.query(ArticleImage)
-            .filter(ArticleImage.article_id == article.id, ArticleImage.user_id == user_id, ArticleImage.status == "generated")
-            .order_by(ArticleImage.updated_at.desc())
-            .all()
-        )
-        if image.image_url
-    ]
+    if isinstance(article, Article):
+        image_links = [
+            image.image_url
+            for image in (
+                db.query(ArticleImage)
+                .filter(ArticleImage.article_id == article.id, ArticleImage.user_id == user_id, ArticleImage.status == "generated")
+                .order_by(ArticleImage.updated_at.desc())
+                .all()
+            )
+            if image.image_url
+        ]
+    else:
+        image_links = payload.fallback_image_links or []
     rows = build_article_sheet_rows(article, destination_label=destination.label, image_links=image_links)
     try:
         result = append_article_rows_to_sheet(

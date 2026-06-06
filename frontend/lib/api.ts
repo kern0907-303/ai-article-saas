@@ -191,10 +191,21 @@ export const api = {
     },
   ) => request<ArticleImage[]>(`/articles/${articleId}/generate-images`, { method: "POST", body: JSON.stringify(payload) }),
   listArticleImages: (articleId: number) => request<ArticleImage[]>(`/articles/${articleId}/images`),
-  exportArticleToGoogleSheets: (articleId: number, destinationId?: number) =>
+  exportArticleToGoogleSheets: (
+    articleId: number,
+    destinationId?: number,
+    fallback?: {
+      fallback_topic?: string;
+      fallback_outline?: string;
+      fallback_content?: string;
+      fallback_generation_model?: string;
+      fallback_generation_status?: string;
+      fallback_image_links?: string[];
+    },
+  ) =>
     request<GoogleSheetExportResponse>(`/articles/${articleId}/export/google-sheets`, {
       method: "POST",
-      body: JSON.stringify({ destination_id: destinationId || null }),
+      body: JSON.stringify({ destination_id: destinationId || null, ...(fallback || {}) }),
     }),
 
   publishWebsite: (id: number) => request<{ message: string }>(`/publish/website/${id}`, { method: "POST" }),

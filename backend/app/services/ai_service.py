@@ -30,12 +30,14 @@ def build_article_prompt(topic: str, outline: str, contexts: list[str], user_pro
 
 請遵守：
 1. 全文使用繁體中文。
-2. 內容結構完整，需有標題、小節標題、結論。
+2. 內容結構完整，但請用自然段落與自然標題呈現，不要使用格式說明字。
 3. 避免捏造無根據數據，如引用請以中性描述處理。
 4. 請輸出純文字格式，不要使用 Markdown。
 5. 不要輸出 `#`、`##`、`###`、`**`、`__` 這類 Markdown 符號。
 6. 標題與小節請直接用一般文字換行呈現。
 7. 不要輸出 ```markdown、```、---、1. 這類格式符號。
+8. 不要出現「引言」、「前言」、「導言」、「內容」、「正文」、「結論」、「總結」、「小結」、「開場」、「結尾」等段落說明文字，也不要用「引言：」、「結論：」這類標籤開頭。
+9. 請直接寫文章本身，不要加「以下是」、「本文將」、「文章內容如下」等前導說明。
 """.strip()
 
 
@@ -335,5 +337,9 @@ def sanitize_generated_article(content: str) -> str:
     sanitized = re.sub(r"(?m)^\s*[-*_]{3,}\s*$", "", sanitized)
     sanitized = re.sub(r"(?m)^\s*(\d+)\.\s+", "", sanitized)
     sanitized = re.sub(r"(?m)^\s*[-*+]\s+", "", sanitized)
+    label_words = "引言|前言|導言|內容|正文|結論|總結|小結|開場|結尾"
+    sanitized = re.sub(rf"(?m)^\s*(?:{label_words})\s*[：:]\s*", "", sanitized)
+    sanitized = re.sub(rf"(?m)^\s*(?:{label_words})\s*$\n?", "", sanitized)
+    sanitized = re.sub(r"(?m)^\s*(?:以下是|文章內容如下|本文將)[^\n]*\n?", "", sanitized)
     sanitized = re.sub(r"\n{3,}", "\n\n", sanitized)
     return sanitized.strip()

@@ -12,6 +12,8 @@ SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 SHEETS_APPEND_URL = "https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{range_name}:append"
 GOOGLE_TIMEOUT = httpx.Timeout(connect=15.0, read=60.0, write=30.0, pool=30.0)
+GOOGLE_SHEETS_CELL_LIMIT = 50000
+ARTICLE_CONTENT_CHUNK_SIZE = 45000
 
 
 @dataclass(frozen=True)
@@ -56,7 +58,19 @@ def normalize_sheet_destination_payload(payload: dict[str, Any]) -> dict[str, An
     return data
 
 
-def build_article_sheet_row(article: Any, destination_label: str, image_links: list[str] | None = None) -> list[Any]:
+def split_article_content_for_sheet(content: str) -> list[str]:
+    if len(content) <= GOOGLE_SHEETS_CELL_LIMIT:
+        return [content]
+
+    chunks: list[str] = []
+    remaining = content
+    while remaining:
+        chunks.append(remaining[:ARTICLE_CONTENT_CHUNK_SIZE])
+        remaining = remaining[ARTICLE_CONTENT_CHUNK_SIZE:]
+    return chunks
+
+
+def _build_article_sheet_base_row(article: Any, destination_label: str, image_links: list[str] | None = None) -> list[Any]:
     updated_at = getattr(article, "updated_at", None) or datetime.utcnow()
     if hasattr(updated_at, "isoformat"):
         updated_text = updated_at.isoformat()
@@ -69,13 +83,34 @@ def build_article_sheet_row(article: Any, destination_label: str, image_links: l
         article.id,
         article.topic,
         article.outline,
-        article.content or "",
+        "",
         article.generation_model or "",
         article.generation_status,
         "yes" if article.published_to_website else "no",
         "yes" if article.published_to_social else "no",
         "\n".join(image_links or []),
     ]
+
+
+def build_article_sheet_rows(article: Any, destination_label: str, image_links: list[str] | None = None) -> list[list[Any]]:
+    base_row = _build_article_sheet_base_row(article, destination_label, image_links)
+    content_chunks = split_article_content_for_sheet(article.content or "")
+    if len(content_chunks) == 1:
+        row = list(base_row)
+        row[5] = content_chunks[0]
+        return [row]
+
+    rows: list[list[Any]] = []
+    total = len(content_chunks)
+    for index, chunk in enumerate(content_chunks, start=1):
+        row = list(base_row)
+        row[5] = f"[第 {index}/{total} 段]\n{chunk}"
+        rows.append(row)
+    return rows
+
+
+def build_article_sheet_row(article: Any, destination_label: str, image_links: list[str] | None = None) -> list[Any]:
+    return build_article_sheet_rows(article, destination_label, image_links)[0]
 
 
 def _build_jwt_assertion(service_account: dict[str, Any]) -> str:
@@ -116,6 +151,21 @@ def append_article_row_to_sheet(
     sheet_name: str,
     row: list[Any],
 ) -> GoogleSheetsAppendResult:
+    return append_article_rows_to_sheet(
+        service_account_json=service_account_json,
+        spreadsheet_id=spreadsheet_id,
+        sheet_name=sheet_name,
+        rows=[row],
+    )
+
+
+def append_article_rows_to_sheet(
+    *,
+    service_account_json: str,
+    spreadsheet_id: str,
+    sheet_name: str,
+    rows: list[list[Any]],
+) -> GoogleSheetsAppendResult:
     access_token = fetch_access_token(service_account_json)
     range_name = f"{sheet_name}!A:K"
     url = SHEETS_APPEND_URL.format(
@@ -126,7 +176,7 @@ def append_article_row_to_sheet(
         url,
         params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
         headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-        json={"values": [row]},
+        json={"values": rows},
         timeout=GOOGLE_TIMEOUT,
     )
     if response.is_error:

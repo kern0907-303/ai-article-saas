@@ -3,8 +3,10 @@ from datetime import datetime
 import pytest
 
 from app.services.google_sheets_service import (
+    GOOGLE_SHEETS_CELL_LIMIT,
     GoogleSheetsAppendResult,
     build_article_sheet_row,
+    build_article_sheet_rows,
     normalize_sheet_destination_payload,
 )
 
@@ -65,6 +67,20 @@ def test_build_article_sheet_row_contains_publish_ready_fields():
     assert row[6] == "gpt-5.4-mini"
     assert row[9] == "yes"
     assert row[10] == "https://public.example.com/article/cover.png"
+
+
+def test_build_article_sheet_rows_splits_long_content_for_google_cell_limit():
+    class LongArticleStub(ArticleStub):
+        content = "A" * (GOOGLE_SHEETS_CELL_LIMIT + 1000)
+
+    rows = build_article_sheet_rows(LongArticleStub(), destination_label="客戶 A")
+
+    assert len(rows) == 2
+    assert rows[0][5].startswith("[第 1/2 段]\n")
+    assert rows[1][5].startswith("[第 2/2 段]\n")
+    assert all(len(str(row[5])) <= GOOGLE_SHEETS_CELL_LIMIT for row in rows)
+    assert rows[0][0] == rows[1][0] == "2026-06-04T10:00:00"
+    assert rows[0][2] == rows[1][2] == 42
 
 
 def test_append_result_reports_updated_range():

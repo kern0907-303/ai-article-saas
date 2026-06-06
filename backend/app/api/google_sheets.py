@@ -16,8 +16,8 @@ from app.schemas.google_sheets import (
 from app.services.audit_service import log_audit
 from app.services.crypto_service import decrypt_text, encrypt_text
 from app.services.google_sheets_service import (
-    append_article_row_to_sheet,
-    build_article_sheet_row,
+    append_article_rows_to_sheet,
+    build_article_sheet_rows,
     normalize_sheet_destination_payload,
 )
 from app.utils.deps import get_current_user_id, require_active_subscription
@@ -188,13 +188,13 @@ def export_article_to_google_sheets(
         )
         if image.image_url
     ]
-    row = build_article_sheet_row(article, destination_label=destination.label, image_links=image_links)
+    rows = build_article_sheet_rows(article, destination_label=destination.label, image_links=image_links)
     try:
-        result = append_article_row_to_sheet(
+        result = append_article_rows_to_sheet(
             service_account_json=service_account_json,
             spreadsheet_id=destination.spreadsheet_id,
             sheet_name=destination.sheet_name,
-            row=row,
+            rows=rows,
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

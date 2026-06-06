@@ -41,6 +41,42 @@ const PROMPT_TEMPLATES = [
   },
 ];
 
+const ARTICLE_DRAFT_STORAGE_KEY = "ai_article_saas.article_page_draft.v1";
+
+type ArticlePageDraft = {
+  selectedImageStyle: string;
+  selectedImageSize: string;
+  selectedSheetDestinationId: number | null;
+  needTextOverlay: boolean;
+  imageTextLanguage: string;
+  imageTextContent: string;
+  selectedIds: number[];
+  topic: string;
+  outline: string;
+  prompt: string;
+  promptRequirement: string;
+  templateKey: string;
+  content: string;
+  currentArticleId: number | null;
+};
+
+const readArticleDraft = (): Partial<ArticlePageDraft> => {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(ARTICLE_DRAFT_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeArticleDraft = (draft: ArticlePageDraft) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ARTICLE_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+};
+
 const isPublicSheetImage = (image: ArticleImage) =>
   image.status === "generated" &&
   !!image.image_url &&
@@ -101,6 +137,7 @@ export default function ArticlesPage() {
   const [publishingChannel, setPublishingChannel] = useState<"website" | "social" | null>(null);
   const [pollingArticleId, setPollingArticleId] = useState<number | null>(null);
   const [pollingImageArticleId, setPollingImageArticleId] = useState<number | null>(null);
+  const [draftHydrated, setDraftHydrated] = useState(false);
 
   const currentArticle = useMemo(
     () => articles.find((item) => item.id === currentArticleId) || null,
@@ -127,6 +164,65 @@ export default function ArticlesPage() {
     setImageSelectionTouched(false);
     setSelectedSheetImageIds([]);
   }, [currentArticleId]);
+
+  useEffect(() => {
+    const draft = readArticleDraft();
+    if (typeof draft.selectedImageStyle === "string") setSelectedImageStyle(draft.selectedImageStyle);
+    if (typeof draft.selectedImageSize === "string") setSelectedImageSize(draft.selectedImageSize);
+    if (typeof draft.selectedSheetDestinationId === "number" || draft.selectedSheetDestinationId === null) {
+      setSelectedSheetDestinationId(draft.selectedSheetDestinationId);
+    }
+    if (typeof draft.needTextOverlay === "boolean") setNeedTextOverlay(draft.needTextOverlay);
+    if (typeof draft.imageTextLanguage === "string") setImageTextLanguage(draft.imageTextLanguage);
+    if (typeof draft.imageTextContent === "string") setImageTextContent(draft.imageTextContent);
+    if (Array.isArray(draft.selectedIds)) setSelectedIds(draft.selectedIds.filter((id) => typeof id === "number"));
+    if (typeof draft.topic === "string") setTopic(draft.topic);
+    if (typeof draft.outline === "string") setOutline(draft.outline);
+    if (typeof draft.prompt === "string") setPrompt(draft.prompt);
+    if (typeof draft.promptRequirement === "string") setPromptRequirement(draft.promptRequirement);
+    if (typeof draft.templateKey === "string") setTemplateKey(draft.templateKey);
+    if (typeof draft.content === "string") setContent(draft.content);
+    if (typeof draft.currentArticleId === "number" || draft.currentArticleId === null) {
+      setCurrentArticleId(draft.currentArticleId);
+    }
+    setDraftHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated) return;
+    writeArticleDraft({
+      selectedImageStyle,
+      selectedImageSize,
+      selectedSheetDestinationId,
+      needTextOverlay,
+      imageTextLanguage,
+      imageTextContent,
+      selectedIds,
+      topic,
+      outline,
+      prompt,
+      promptRequirement,
+      templateKey,
+      content,
+      currentArticleId,
+    });
+  }, [
+    content,
+    currentArticleId,
+    draftHydrated,
+    imageTextContent,
+    imageTextLanguage,
+    needTextOverlay,
+    outline,
+    prompt,
+    promptRequirement,
+    selectedIds,
+    selectedImageSize,
+    selectedImageStyle,
+    selectedSheetDestinationId,
+    templateKey,
+    topic,
+  ]);
 
   const load = async () => {
     const [presets, sizes, sheets, entitlementData] = await Promise.all([
@@ -157,22 +253,28 @@ export default function ArticlesPage() {
     setArticles(articleList);
 
     const newest = articleList[0];
-    if (newest && !currentArticleId) {
-      setCurrentArticleId(newest.id);
-      const imageList = await api.listArticleImages(newest.id);
+    const activeArticle = (currentArticleId && articleList.find((article) => article.id === currentArticleId)) || newest;
+    if (activeArticle) {
+      if (!currentArticleId) {
+        setCurrentArticleId(activeArticle.id);
+      }
+      const imageList = await api.listArticleImages(activeArticle.id);
       setImages(imageList);
       if (imageList.some((image) => image.status === "queued" || image.status === "generating")) {
-        setPollingImageArticleId(newest.id);
+        setPollingImageArticleId(activeArticle.id);
       }
-      setContent(newest.content || "");
-    } else if (!newest) {
+      setTopic((prev) => prev || activeArticle.topic || "");
+      setOutline((prev) => prev || activeArticle.outline || "");
+      setContent((prev) => prev || activeArticle.content || "");
+    } else {
       setImages([]);
     }
   };
 
   useEffect(() => {
+    if (!draftHydrated) return;
     load().catch((err: Error) => setStatus(`初始化失敗：${err.message}`));
-  }, []);
+  }, [draftHydrated]);
 
   useEffect(() => {
     if (!pollingArticleId) return;

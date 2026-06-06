@@ -14,6 +14,7 @@ SHEETS_APPEND_URL = "https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_
 GOOGLE_TIMEOUT = httpx.Timeout(connect=15.0, read=60.0, write=30.0, pool=30.0)
 GOOGLE_SHEETS_CELL_LIMIT = 50000
 ARTICLE_CONTENT_CHUNK_SIZE = 45000
+OVERSIZED_CELL_PLACEHOLDER = "[內容超過 Google Sheets 單格限制，已略過]"
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,26 @@ def split_article_content_for_sheet(content: str) -> list[str]:
     return chunks
 
 
+def normalize_sheet_image_links(image_links: list[str] | None) -> list[str]:
+    normalized: list[str] = []
+    skipped_embedded_images = 0
+    for link in image_links or []:
+        cleaned = str(link or "").strip()
+        if not cleaned:
+            continue
+        if cleaned.startswith("data:image/"):
+            skipped_embedded_images += 1
+            continue
+        if len(cleaned) > GOOGLE_SHEETS_CELL_LIMIT:
+            normalized.append(OVERSIZED_CELL_PLACEHOLDER)
+            continue
+        normalized.append(cleaned)
+
+    if skipped_embedded_images:
+        normalized.append(f"{skipped_embedded_images} 張圖片已生成，但尚未上傳成公開連結")
+    return normalized
+
+
 def _build_article_sheet_base_row(article: Any, destination_label: str, image_links: list[str] | None = None) -> list[Any]:
     updated_at = getattr(article, "updated_at", None) or datetime.utcnow()
     if hasattr(updated_at, "isoformat"):
@@ -88,7 +109,7 @@ def _build_article_sheet_base_row(article: Any, destination_label: str, image_li
         article.generation_status,
         "yes" if article.published_to_website else "no",
         "yes" if article.published_to_social else "no",
-        "\n".join(image_links or []),
+        "\n".join(normalize_sheet_image_links(image_links)),
     ]
 
 
@@ -111,6 +132,19 @@ def build_article_sheet_rows(article: Any, destination_label: str, image_links: 
 
 def build_article_sheet_row(article: Any, destination_label: str, image_links: list[str] | None = None) -> list[Any]:
     return build_article_sheet_rows(article, destination_label, image_links)[0]
+
+
+def sanitize_sheet_rows(rows: list[list[Any]]) -> list[list[Any]]:
+    sanitized: list[list[Any]] = []
+    for row in rows:
+        sanitized_row: list[Any] = []
+        for cell in row:
+            if isinstance(cell, str) and len(cell) > GOOGLE_SHEETS_CELL_LIMIT:
+                sanitized_row.append(OVERSIZED_CELL_PLACEHOLDER)
+            else:
+                sanitized_row.append(cell)
+        sanitized.append(sanitized_row)
+    return sanitized
 
 
 def _build_jwt_assertion(service_account: dict[str, Any]) -> str:
@@ -167,6 +201,7 @@ def append_article_rows_to_sheet(
     rows: list[list[Any]],
 ) -> GoogleSheetsAppendResult:
     access_token = fetch_access_token(service_account_json)
+    safe_rows = sanitize_sheet_rows(rows)
     range_name = f"{sheet_name}!A:K"
     url = SHEETS_APPEND_URL.format(
         spreadsheet_id=quote(spreadsheet_id, safe=""),
@@ -176,7 +211,7 @@ def append_article_rows_to_sheet(
         url,
         params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
         headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-        json={"values": rows},
+        json={"values": safe_rows},
         timeout=GOOGLE_TIMEOUT,
     )
     if response.is_error:

@@ -4,10 +4,12 @@ import pytest
 
 from app.services.google_sheets_service import (
     GOOGLE_SHEETS_CELL_LIMIT,
+    OVERSIZED_CELL_PLACEHOLDER,
     GoogleSheetsAppendResult,
     build_article_sheet_row,
     build_article_sheet_rows,
     normalize_sheet_destination_payload,
+    sanitize_sheet_rows,
 )
 
 
@@ -81,6 +83,30 @@ def test_build_article_sheet_rows_splits_long_content_for_google_cell_limit():
     assert all(len(str(row[5])) <= GOOGLE_SHEETS_CELL_LIMIT for row in rows)
     assert rows[0][0] == rows[1][0] == "2026-06-04T10:00:00"
     assert rows[0][2] == rows[1][2] == 42
+
+
+def test_build_article_sheet_row_skips_embedded_base64_image_data():
+    row = build_article_sheet_row(
+        ArticleStub(),
+        destination_label="客戶 A",
+        image_links=[
+            f"data:image/png;base64,{'A' * 60000}",
+            "https://public.example.com/article/cover.png",
+        ],
+    )
+
+    assert "data:image" not in row[10]
+    assert "https://public.example.com/article/cover.png" in row[10]
+    assert "1 張圖片已生成" in row[10]
+    assert len(row[10]) < GOOGLE_SHEETS_CELL_LIMIT
+
+
+def test_sanitize_sheet_rows_replaces_any_oversized_cell_before_append():
+    rows = [["ok", "B" * (GOOGLE_SHEETS_CELL_LIMIT + 1)]]
+
+    sanitized = sanitize_sheet_rows(rows)
+
+    assert sanitized == [["ok", OVERSIZED_CELL_PLACEHOLDER]]
 
 
 def test_append_result_reports_updated_range():

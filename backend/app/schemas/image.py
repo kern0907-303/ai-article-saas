@@ -40,6 +40,7 @@ class ImageSizePresetOut(BaseModel):
     label: str
     description: str
     size: str
+    generation_size: str
     width: int
     height: int
 

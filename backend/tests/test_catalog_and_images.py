@@ -3,6 +3,7 @@ from app.services.image_service import (
     IMAGE_SIZE_PRESETS,
     build_openai_image_generate_params,
     parse_size,
+    resolve_size,
     resolve_output_format,
     resolve_quality,
 )
@@ -37,6 +38,13 @@ def test_social_image_size_presets_are_named_for_platforms():
     assert parse_size(sizes["instagram_square"]) == (1080, 1080)
     assert parse_size(sizes["instagram_story"]) == (1080, 1920)
     assert parse_size(sizes["facebook_link"]) == (1200, 630)
+
+
+def test_social_image_presets_resolve_to_gpt_image_supported_sizes():
+    assert resolve_size("instagram_square", "1080x1080") == "1024x1024"
+    assert resolve_size("instagram_story", "1080x1080") == "1024x1536"
+    assert resolve_size("facebook_link", "1080x1080") == "1536x1024"
+    assert resolve_size("1200x630", "1080x1080") == "1536x1024"
 
 
 def test_openai_image_accepts_auto_quality_and_webp_format():

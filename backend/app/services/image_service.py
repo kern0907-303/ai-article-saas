@@ -35,6 +35,7 @@ IMAGE_SIZE_PRESETS: list[dict[str, str | int]] = [
         "label": "Instagram 方形貼文",
         "description": "適合 IG 貼文、Facebook 方形素材",
         "size": "1080x1080",
+        "generation_size": "1024x1024",
         "width": 1080,
         "height": 1080,
     },
@@ -43,6 +44,7 @@ IMAGE_SIZE_PRESETS: list[dict[str, str | int]] = [
         "label": "Instagram Story / Reels",
         "description": "適合限時動態、Reels、TikTok 直式素材",
         "size": "1080x1920",
+        "generation_size": "1024x1536",
         "width": 1080,
         "height": 1920,
     },
@@ -51,6 +53,7 @@ IMAGE_SIZE_PRESETS: list[dict[str, str | int]] = [
         "label": "Facebook / LinkedIn 連結圖",
         "description": "適合橫式連結預覽與商務社群分享",
         "size": "1200x630",
+        "generation_size": "1536x1024",
         "width": 1200,
         "height": 630,
     },
@@ -59,6 +62,7 @@ IMAGE_SIZE_PRESETS: list[dict[str, str | int]] = [
         "label": "X / Twitter 橫式圖",
         "description": "適合寬版社群貼文與摘要卡片",
         "size": "1600x900",
+        "generation_size": "1536x1024",
         "width": 1600,
         "height": 900,
     },
@@ -67,12 +71,14 @@ IMAGE_SIZE_PRESETS: list[dict[str, str | int]] = [
         "label": "部落格封面",
         "description": "適合網站文章首圖與一般橫式封面",
         "size": "1536x1024",
+        "generation_size": "1536x1024",
         "width": 1536,
         "height": 1024,
     },
 ]
 
 OPENAI_IMAGE_TIMEOUT = httpx.Timeout(connect=15.0, read=240.0, write=60.0, pool=60.0)
+OPENAI_GPT_IMAGE_SUPPORTED_SIZES = {"1024x1024", "1024x1536", "1536x1024", "auto"}
 
 
 def parse_size(size: str) -> tuple[int, int]:
@@ -87,11 +93,24 @@ def resolve_size(size: str | None, fallback_size: str) -> str:
     requested = (size or "").strip()
     preset = next((item for item in IMAGE_SIZE_PRESETS if item["key"] == requested), None)
     if preset:
-        return str(preset["size"])
+        return str(preset["generation_size"])
     if requested:
         width, height = parse_size(requested)
-        return f"{width}x{height}"
-    return fallback_size
+        return resolve_openai_gpt_image_size(f"{width}x{height}")
+    return resolve_openai_gpt_image_size(fallback_size)
+
+
+def resolve_openai_gpt_image_size(size: str) -> str:
+    normalized = (size or "").strip().lower()
+    if normalized in OPENAI_GPT_IMAGE_SUPPORTED_SIZES:
+        return normalized
+
+    width, height = parse_size(normalized)
+    if width == height:
+        return "1024x1024"
+    if height > width:
+        return "1024x1536"
+    return "1536x1024"
 
 
 def has_cjk(text: str) -> bool:

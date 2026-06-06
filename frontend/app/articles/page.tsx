@@ -46,6 +46,22 @@ const isPublicSheetImage = (image: ArticleImage) =>
   !!image.image_url &&
   (image.image_url.startsWith("http://") || image.image_url.startsWith("https://"));
 
+const imageFileExtension = (imageUrl: string) => {
+  const dataMatch = imageUrl.match(/^data:image\/(png|jpeg|jpg|webp);/);
+  if (dataMatch) return dataMatch[1] === "jpeg" ? "jpg" : dataMatch[1];
+
+  try {
+    const pathname = new URL(imageUrl).pathname;
+    const extension = pathname.split(".").pop()?.toLowerCase();
+    if (extension && ["png", "jpg", "jpeg", "webp"].includes(extension)) {
+      return extension === "jpeg" ? "jpg" : extension;
+    }
+  } catch {
+    return "png";
+  }
+  return "png";
+};
+
 export default function ArticlesPage() {
   const [files, setFiles] = useState<KnowledgeFile[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -247,6 +263,45 @@ export default function ArticlesPage() {
   const toggleSheetImage = (id: number) => {
     setImageSelectionTouched(true);
     setSelectedSheetImageIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const downloadImage = async (image: ArticleImage) => {
+    if (!image.image_url) {
+      setStatus("這張圖片目前沒有可下載的圖片資料");
+      return;
+    }
+
+    const filename = `article-${currentArticleId || "draft"}-image-${image.id}-${image.width}x${image.height}.${imageFileExtension(
+      image.image_url,
+    )}`;
+
+    const triggerDownload = (url: string) => {
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    };
+
+    try {
+      if (image.image_url.startsWith("data:image/")) {
+        triggerDownload(image.image_url);
+        setStatus(`圖片已下載：${filename}`);
+        return;
+      }
+
+      const response = await fetch(image.image_url);
+      if (!response.ok) throw new Error("圖片下載失敗");
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      triggerDownload(objectUrl);
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      setStatus(`圖片已下載：${filename}`);
+    } catch {
+      window.open(image.image_url, "_blank", "noopener,noreferrer");
+      setStatus("瀏覽器已開啟圖片，若未自動下載請在圖片上按右鍵另存");
+    }
   };
 
   const onSelectTemplate = (value: string) => {
@@ -670,6 +725,15 @@ export default function ArticlesPage() {
                   {" / "}
                   size: {image.width}x{image.height}
                 </p>
+                {image.image_url && (
+                  <button
+                    type="button"
+                    onClick={() => downloadImage(image)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    下載圖片
+                  </button>
+                )}
                 <label
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
                     isPublicSheetImage(image)
@@ -687,7 +751,7 @@ export default function ArticlesPage() {
                   <span>
                     {isPublicSheetImage(image)
                       ? "上傳此圖片連結到 Google Sheets"
-                      : "尚無公開圖片連結，無法上傳到 Google Sheets"}
+                      : "圖片可下載，但目前沒有公開網址可寫入 Google Sheets"}
                   </span>
                 </label>
                 {image.provider === "nano_banana" && (

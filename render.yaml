@@ -20,7 +20,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.8
       - key: AUTH_ENABLED
-        value: false
+        value: true
       - key: JWT_SECRET_KEY
         sync: false
       - key: ENCRYPTION_SECRET

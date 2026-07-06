@@ -51,6 +51,7 @@ def import_model_modules() -> None:
     import app.models.subscription  # noqa: F401
     import app.models.usage_counter  # noqa: F401
     import app.models.user  # noqa: F401
+    import app.models.workspace  # noqa: F401
 
 
 def normalize_database_url(database_url: str) -> str:

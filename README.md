@@ -238,7 +238,7 @@ AUTH_ENABLED=true
 NEXT_PUBLIC_AUTH_ENABLED=true
 ```
 
-重新啟用前請先接好持久化資料庫，例如 PostgreSQL，避免帳號再次因部署或重啟消失。
+正式多人 SaaS 必須啟用登入。若 `AUTH_ENABLED=false`，後端會使用同一個本機預設帳號，所有使用者會共用同一份設定、文章與知識庫，不適合公開服務。重新啟用前請先接好持久化資料庫或 Render Persistent Disk，避免帳號再次因部署或重啟消失。
 
 ## 生產環境資料持久化
 
@@ -256,13 +256,27 @@ NEXT_PUBLIC_AUTH_ENABLED=true
 RENDER_DISK_PATH=/var/data
 DATABASE_URL=sqlite:////var/data/ai-article-saas/app.db
 STORAGE_DIR=/var/data/ai-article-saas/storage
-AUTH_ENABLED=false
+AUTH_ENABLED=true
 JWT_SECRET_KEY=請填固定且夠長的隨機字串，不要重新產生
 ENCRYPTION_SECRET=請填固定密鑰，不要重新產生，否則既有 API Key 會解不開
 ADMIN_API_KEY=請填固定且夠長的管理金鑰
 REQUIRE_PERSISTENT_DATABASE=true
 CORS_ORIGINS=https://你的前端網域
 ```
+
+只有單人本機內測時才可暫時關閉：
+
+```bash
+AUTH_ENABLED=false
+```
+
+多人正式環境的 Cloudflare Pages 前端也要設定：
+
+```bash
+NEXT_PUBLIC_AUTH_ENABLED=true
+```
+
+否則前端會隱藏登入入口，而後端若要求 Token 會回 401。
 
 後台已新增「帳號資料區」，可查看：
 - 目前帳號資料是否使用持久化資料庫
@@ -294,6 +308,70 @@ NEXT_PUBLIC_API_BASE_URL=https://your-backend.onrender.com/api
 ```
 
 如果舊環境已經有 Render Free Postgres，從 `render.yaml` 移除資料庫不會自動刪除既有資料庫。確認新版本已經改用 Persistent Disk 後，可在 Render Dashboard 手動刪除不用的 Postgres，避免混淆。
+
+### Cloudflare Pages 部署建議：Static Export + Worker Proxy
+
+前端可用 Next.js static export 部署到 Cloudflare Pages：
+
+```bash
+cd frontend
+npm ci
+npm run build:cloudflare
+```
+
+Cloudflare Pages 設定：
+
+```txt
+Build command: npm run build:cloudflare
+Build output directory: out
+Root directory: frontend
+```
+
+`frontend/public/_worker.js` 會在 export 後出現在 `out/_worker.js`，負責把同網域 `/api/*` 代理到 Render backend。預設後端為：
+
+```txt
+https://ai-article-saas.onrender.com
+```
+
+若要改後端，請在 Cloudflare Pages 環境變數設定：
+
+```bash
+API_ORIGIN=https://你的-render-backend.onrender.com
+NEXT_PUBLIC_AUTH_ENABLED=true
+```
+
+特殊健康檢查路由：
+- `https://你的-pages-網域/api/healthz` → Render `/healthz`
+- `https://你的-pages-網域/api/readyz` → Render `/readyz`
+- 其他 `/api/*` → Render `/api/*`
+
+正式部署後請跑：
+
+```bash
+./scripts/stability_check.sh
+```
+
+如果出現 `persistent_storage_enabled=false` 警告，代表 Render 後端沒有用到 Persistent Disk 或環境變數未套用，知識庫與設定仍有遺失風險。
+如果出現 `auth_enabled=false` 警告，代表正式站仍在共用 fallback local user，會造成多人資料污染；公開服務前必須修正。
+
+### 本機驗證指令
+
+後端測試：
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+cd ..
+./scripts/test_backend.sh
+```
+
+前端 static export：
+
+```bash
+./scripts/test_frontend.sh
+```
 
 ### pCloud 圖片上傳設定
 

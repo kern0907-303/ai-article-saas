@@ -1,10 +1,11 @@
 import os
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.knowledge_file import KnowledgeFile
+from app.models.workspace import Workspace
 from app.schemas.knowledge_file import KnowledgeFileDefaultReferenceUpdate, KnowledgeFileOut
 from app.services.audit_service import log_audit
 from app.services.entitlement_service import require_feature_access
@@ -20,27 +21,44 @@ router = APIRouter(
 
 @router.get("", response_model=list[KnowledgeFileOut])
 def list_knowledge_files(
+    workspace_id: int | None = Query(default=None),
+    category: str | None = Query(default=None),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
-    return (
-        db.query(KnowledgeFile)
-        .filter(KnowledgeFile.user_id == user_id, KnowledgeFile.is_active.is_(True))
-        .order_by(KnowledgeFile.created_at.desc())
-        .all()
+    query = db.query(KnowledgeFile).filter(KnowledgeFile.user_id == user_id, KnowledgeFile.is_active.is_(True))
+    if workspace_id is not None:
+        query = query.filter(KnowledgeFile.workspace_id == workspace_id)
+    if category:
+        query = query.filter(KnowledgeFile.category == category)
+    return query.order_by(KnowledgeFile.created_at.desc()).all()
+
+
+def _validate_workspace(db: Session, user_id: str, workspace_id: int | None) -> None:
+    if workspace_id is None:
+        return
+    exists = (
+        db.query(Workspace.id)
+        .filter(Workspace.id == workspace_id, Workspace.user_id == user_id, Workspace.is_active.is_(True))
+        .first()
     )
+    if not exists:
+        raise HTTPException(status_code=404, detail="找不到品牌/專案")
 
 
 @router.post("", response_model=KnowledgeFileOut)
 async def upload_knowledge_file(
     file: UploadFile = File(...),
     include_as_default_reference: bool = Form(True),
+    workspace_id: int | None = Form(None),
+    category: str = Form("reference_material"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     if not file.filename:
         raise HTTPException(status_code=400, detail="請提供檔案")
 
+    _validate_workspace(db, user_id, workspace_id)
     stored_path, size = await save_uploaded_file(user_id, file)
     try:
         require_feature_access(db, int(user_id), feature="knowledge_upload", extra_bytes=size)
@@ -55,6 +73,8 @@ async def upload_knowledge_file(
         user_id=user_id,
         file_name=file.filename,
         stored_path=stored_path,
+        workspace_id=workspace_id,
+        category=category,
         content_type=file.content_type,
         file_size=size,
         extracted_text_preview=extracted_text[:500],
@@ -65,7 +85,12 @@ async def upload_knowledge_file(
     db.commit()
     db.refresh(record)
 
-    log_audit(db, action="knowledge.upload", user_id=user_id, metadata={"file_id": record.id, "file_name": file.filename})
+    log_audit(
+        db,
+        action="knowledge.upload",
+        user_id=user_id,
+        metadata={"file_id": record.id, "file_name": file.filename, "workspace_id": workspace_id, "category": category},
+    )
     return record
 
 

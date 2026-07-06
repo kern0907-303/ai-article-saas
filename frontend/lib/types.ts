@@ -30,6 +30,8 @@ export type KnowledgeFile = {
   user_id: string;
   file_name: string;
   stored_path: string;
+  workspace_id?: number | null;
+  category: string;
   content_type?: string;
   file_size: number;
   extracted_text_preview?: string;
@@ -39,17 +41,33 @@ export type KnowledgeFile = {
 export type Article = {
   id: number;
   user_id: string;
+  workspace_id?: number | null;
   topic: string;
   outline: string;
   content?: string;
   generation_error?: string;
   selected_file_ids?: string;
+  knowledge_categories?: string;
   generation_model?: string;
   generation_status: string;
   published_to_website: boolean;
   published_to_social: boolean;
   publish_website_result?: string;
   publish_social_result?: string;
+};
+
+export type Workspace = {
+  id: number;
+  user_id: string;
+  name: string;
+  description?: string;
+  tone?: string;
+  audience?: string;
+  notes?: string;
+  is_default: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 export type AuthUser = {

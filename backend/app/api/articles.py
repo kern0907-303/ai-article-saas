@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.database import SessionLocal
 from app.models.article import Article
-from app.models.knowledge_file import KnowledgeFile
 from app.models.settings import Setting
+from app.models.workspace import Workspace
 from app.schemas.article import (
     ArticleGenerateRequest,
     ArticleOut,
@@ -17,7 +17,7 @@ from app.services.ai_service import expand_prompt as expand_prompt_with_provider
 from app.services.ai_service import generate_article as generate_article_with_provider
 from app.services.audit_service import log_audit
 from app.services.entitlement_service import consume_feature_usage, require_feature_access
-from app.services.file_service import extract_text_from_file
+from app.services.knowledge_context_service import build_generation_contexts
 from app.services.rate_limit_service import check_rate_limit
 from app.services.crypto_service import decrypt_text
 from app.utils.deps import get_current_user_id, require_active_subscription
@@ -42,6 +42,9 @@ def _generate_article_in_background(
     selected_file_ids: list[int],
     prompt: str | None,
     model: str,
+    use_default_references: bool = True,
+    workspace_id: int | None = None,
+    knowledge_categories: list[str] | None = None,
 ) -> None:
     db = SessionLocal()
     try:
@@ -60,18 +63,17 @@ def _generate_article_in_background(
             db.commit()
             return
 
-        contexts: list[str] = []
-        if selected_file_ids:
-            files = (
-                db.query(KnowledgeFile)
-                .filter(
-                    KnowledgeFile.user_id == user_id,
-                    KnowledgeFile.id.in_(selected_file_ids),
-                    KnowledgeFile.is_active.is_(True),
-                )
-                .all()
-            )
-            contexts = [extract_text_from_file(f.stored_path) for f in files]
+        contexts, used_file_ids = build_generation_contexts(
+            db,
+            user_id=user_id,
+            selected_file_ids=selected_file_ids,
+            topic=topic,
+            outline=outline,
+            user_prompt=prompt,
+            use_default_references=use_default_references,
+            workspace_id=workspace_id,
+            categories=knowledge_categories or [],
+        )
 
         content = generate_article_with_provider(
             user_setting=_hydrate_provider_keys(setting),
@@ -83,6 +85,9 @@ def _generate_article_in_background(
         )
 
         article.content = content
+        article.selected_file_ids = ",".join(str(fid) for fid in used_file_ids) if used_file_ids else None
+        article.workspace_id = workspace_id
+        article.knowledge_categories = ",".join(knowledge_categories or []) if knowledge_categories else None
         article.generation_status = "generated"
         article.generation_error = None
         db.commit()
@@ -111,6 +116,18 @@ def list_articles(
         .order_by(Article.created_at.desc())
         .all()
     )
+
+
+def _validate_workspace(db: Session, user_id: str, workspace_id: int | None) -> None:
+    if workspace_id is None:
+        return
+    exists = (
+        db.query(Workspace.id)
+        .filter(Workspace.id == workspace_id, Workspace.user_id == user_id, Workspace.is_active.is_(True))
+        .first()
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="找不到品牌/專案")
 
 
 @router.post("/prompt-expand", response_model=PromptExpandResponse)
@@ -162,11 +179,13 @@ def generate_article(
 
     article = Article(
         user_id=user_id,
+        workspace_id=payload.workspace_id,
         topic=payload.topic,
         outline=payload.outline,
         content=None,
         generation_error=None,
         selected_file_ids=",".join(str(fid) for fid in payload.selected_file_ids) if payload.selected_file_ids else None,
+        knowledge_categories=",".join(payload.knowledge_categories) if payload.knowledge_categories else None,
         generation_model=model,
         generation_status="queued",
     )
@@ -183,6 +202,9 @@ def generate_article(
         selected_file_ids=payload.selected_file_ids,
         prompt=payload.prompt,
         model=model,
+        use_default_references=payload.use_default_references,
+        workspace_id=payload.workspace_id,
+        knowledge_categories=payload.knowledge_categories,
     )
     return article
 

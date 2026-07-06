@@ -12,7 +12,48 @@ import {
   ImageSizePreset,
   ImageStylePreset,
   KnowledgeFile,
+  Workspace,
 } from "@/lib/types";
+
+const KNOWLEDGE_CATEGORIES = [
+  { key: "writing_skill", label: "寫作 Skill" },
+  { key: "brand_voice", label: "品牌語氣" },
+  { key: "product_info", label: "產品資料" },
+  { key: "audience_profile", label: "受眾輪廓" },
+  { key: "case_study", label: "案例" },
+  { key: "offer", label: "方案/Offer" },
+  { key: "forbidden_rules", label: "禁用規則" },
+  { key: "reference_material", label: "一般參考" },
+  { key: "other", label: "其他" },
+];
+
+const KNOWLEDGE_CATEGORY_PRESETS = [
+  {
+    key: "smart",
+    label: "智慧讀取：寫作 Skill + 品牌 + 產品",
+    categories: ["writing_skill", "brand_voice", "product_info"],
+  },
+  {
+    key: "writing",
+    label: "只讀寫作 Skill",
+    categories: ["writing_skill"],
+  },
+  {
+    key: "brand",
+    label: "品牌內容：品牌 + 受眾 + 禁用規則",
+    categories: ["brand_voice", "audience_profile", "forbidden_rules"],
+  },
+  {
+    key: "sales",
+    label: "銷售內容：產品 + Offer + 案例",
+    categories: ["product_info", "offer", "case_study"],
+  },
+  {
+    key: "all",
+    label: "全部分類",
+    categories: KNOWLEDGE_CATEGORIES.map((category) => category.key),
+  },
+];
 
 const PROMPT_TEMPLATES = [
   {
@@ -51,6 +92,8 @@ type ArticlePageDraft = {
   imageTextLanguage: string;
   imageTextContent: string;
   selectedIds: number[];
+  selectedWorkspaceId: number | null;
+  selectedKnowledgeCategories: string[];
   topic: string;
   outline: string;
   prompt: string;
@@ -105,6 +148,7 @@ const imageFileExtension = (imageUrl: string) => {
 
 export default function ArticlesPage() {
   const [files, setFiles] = useState<KnowledgeFile[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [images, setImages] = useState<ArticleImage[]>([]);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
@@ -121,6 +165,8 @@ export default function ArticlesPage() {
   const [imageSelectionTouched, setImageSelectionTouched] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | null>(null);
+  const [selectedKnowledgeCategories, setSelectedKnowledgeCategories] = useState<string[]>(["writing_skill", "brand_voice", "product_info"]);
   const [topic, setTopic] = useState("");
   const [outline, setOutline] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -153,6 +199,13 @@ export default function ArticlesPage() {
         .filter((url) => url.startsWith("http://") || url.startsWith("https://")),
     [sheetSelectableImages, selectedSheetImageIds],
   );
+  const dataModeValue = useMemo(() => {
+    const sortedSelected = [...selectedKnowledgeCategories].sort().join(",");
+    const matched = KNOWLEDGE_CATEGORY_PRESETS.find(
+      (preset) => [...preset.categories].sort().join(",") === sortedSelected,
+    );
+    return matched?.key || "custom";
+  }, [selectedKnowledgeCategories]);
 
   useEffect(() => {
     const selectableIds = sheetSelectableImages.map((image) => image.id);
@@ -177,6 +230,12 @@ export default function ArticlesPage() {
     if (typeof draft.imageTextLanguage === "string") setImageTextLanguage(draft.imageTextLanguage);
     if (typeof draft.imageTextContent === "string") setImageTextContent(draft.imageTextContent);
     if (Array.isArray(draft.selectedIds)) setSelectedIds(draft.selectedIds.filter((id) => typeof id === "number"));
+    if (typeof draft.selectedWorkspaceId === "number" || draft.selectedWorkspaceId === null) {
+      setSelectedWorkspaceId(draft.selectedWorkspaceId);
+    }
+    if (Array.isArray(draft.selectedKnowledgeCategories)) {
+      setSelectedKnowledgeCategories(draft.selectedKnowledgeCategories.filter((item) => typeof item === "string"));
+    }
     if (typeof draft.topic === "string") setTopic(draft.topic);
     if (typeof draft.outline === "string") setOutline(draft.outline);
     if (typeof draft.prompt === "string") setPrompt(draft.prompt);
@@ -199,6 +258,8 @@ export default function ArticlesPage() {
       imageTextLanguage,
       imageTextContent,
       selectedIds,
+      selectedWorkspaceId,
+      selectedKnowledgeCategories,
       topic,
       outline,
       prompt,
@@ -218,6 +279,8 @@ export default function ArticlesPage() {
     prompt,
     promptRequirement,
     selectedIds,
+    selectedKnowledgeCategories,
+    selectedWorkspaceId,
     selectedImageSize,
     selectedImageStyle,
     selectedSheetDestinationId,
@@ -226,15 +289,18 @@ export default function ArticlesPage() {
   ]);
 
   const load = async () => {
-    const [presets, sizes, sheets, entitlementData] = await Promise.all([
+    const [presets, sizes, sheets, workspaceData, entitlementData] = await Promise.all([
       api.getImageStylePresets(),
       api.getImageSizePresets(),
       api.listGoogleSheetDestinations(),
+      api.listWorkspaces(),
       api.getEntitlements(),
     ]);
     setStylePresets(presets);
     setSizePresets(sizes);
     setSheetDestinations(sheets);
+    setWorkspaces(workspaceData);
+    setSelectedWorkspaceId((prev) => prev || workspaceData.find((item) => item.is_default)?.id || workspaceData[0]?.id || null);
     setSelectedSheetDestinationId((prev) => prev || sheets.find((item) => item.is_default)?.id || sheets[0]?.id || null);
     setEntitlements(entitlementData);
 
@@ -246,7 +312,8 @@ export default function ArticlesPage() {
       return;
     }
 
-    const [fileList, articleList] = await Promise.all([api.listFiles(), api.listArticles()]);
+    const effectiveWorkspaceId = selectedWorkspaceId || workspaceData.find((item) => item.is_default)?.id || workspaceData[0]?.id || null;
+    const [fileList, articleList] = await Promise.all([api.listFiles({ workspace_id: effectiveWorkspaceId }), api.listArticles()]);
     setFiles(fileList);
     setSelectedIds((prev) =>
       prev.length > 0 ? prev : fileList.filter((file) => file.is_default_reference).map((file) => file.id),
@@ -275,7 +342,7 @@ export default function ArticlesPage() {
   useEffect(() => {
     if (!draftHydrated) return;
     load().catch((err: Error) => setStatus(`初始化失敗：${err.message}`));
-  }, [draftHydrated]);
+  }, [draftHydrated, selectedWorkspaceId]);
 
   useEffect(() => {
     if (!pollingArticleId) return;
@@ -370,6 +437,12 @@ export default function ArticlesPage() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
+  const toggleKnowledgeCategory = (key: string) => {
+    setSelectedKnowledgeCategories((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
+    );
+  };
+
   const toggleSheetImage = (id: number) => {
     setImageSelectionTouched(true);
     setSelectedSheetImageIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -459,6 +532,13 @@ export default function ArticlesPage() {
     }
   };
 
+  const onSelectDataMode = (value: string) => {
+    const selected = KNOWLEDGE_CATEGORY_PRESETS.find((preset) => preset.key === value);
+    if (selected) {
+      setSelectedKnowledgeCategories(selected.categories);
+    }
+  };
+
   const expandPrompt = async () => {
     if (!promptRequirement.trim()) {
       setStatus("請先輸入一句話需求");
@@ -491,6 +571,9 @@ export default function ArticlesPage() {
         topic,
         outline,
         selected_file_ids: selectedIds,
+        use_default_references: true,
+        workspace_id: selectedWorkspaceId,
+        knowledge_categories: selectedKnowledgeCategories,
         prompt: prompt || undefined,
       });
       setContent(article.content || "");
@@ -637,7 +720,7 @@ export default function ArticlesPage() {
       <div className="card-surface p-6 space-y-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-2xl font-bold">文章創作與發布</h2>
-          <span className="brand-pill">Created by Eric</span>
+          <span className="brand-pill">AI Article SaaS</span>
         </div>
         <p className="text-slate-700">從提示詞、生成、編修到發布，一頁完成內容工作流。</p>
       </div>
@@ -653,99 +736,195 @@ export default function ArticlesPage() {
       )}
 
       <div className="card-surface p-6 space-y-4">
-        <h3 className="text-lg font-semibold">區塊一：輸入生成條件</h3>
-
         <div>
-          <p className="text-sm font-medium mb-1">選擇參考檔案</p>
-          <div className="flex flex-wrap gap-2">
-            {files.map((file) => (
-              <button
-                key={file.id}
-                type="button"
-                onClick={() => toggleFile(file.id)}
-                className={`rounded-full border px-3 py-1 text-sm transition ${
-                  selectedIds.includes(file.id)
-                    ? "border-[#f09a29] bg-[linear-gradient(135deg,#ffbe0b,#ff7b00)] text-white"
-                    : "bg-white/80 text-slate-700 border-[var(--line)] hover:bg-[#fff0c9]"
-                }`}
-              >
-                {file.file_name}
-              </button>
-            ))}
-          </div>
+          <h3 className="text-lg font-semibold">開始寫文章</h3>
+          <p className="mt-1 text-sm text-slate-600">先選模式、填主題和大綱，就可以生成；其他細節先不用管。</p>
         </div>
 
-        <label className="block text-sm font-medium">
-          選擇提示詞範本
-          <select
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
-            value={templateKey}
-            onChange={(e) => onSelectTemplate(e.target.value)}
-          >
-            <option value="">請選擇範本</option>
-            {PROMPT_TEMPLATES.map((template) => (
-              <option key={template.key} value={template.key}>
-                {template.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="rounded-xl border border-[var(--line)] bg-[linear-gradient(135deg,#fff6da,#ffe2af)] p-4 space-y-2">
+        <div className="grid md:grid-cols-2 gap-3">
           <label className="block text-sm font-medium">
-            一句話需求（AI 會幫你擴寫成精準提示詞）
-            <input
+            品牌 / 專案
+            <select
               className="mt-1 w-full rounded-lg border border-slate-300 p-2"
-              value={promptRequirement}
-              onChange={(e) => setPromptRequirement(e.target.value)}
-              placeholder="例如：我要寫給中小企業老闆看的品牌定位教學"
-            />
+              value={selectedWorkspaceId || ""}
+              onChange={(e) => {
+                setSelectedWorkspaceId(e.target.value ? Number(e.target.value) : null);
+                setSelectedIds([]);
+              }}
+            >
+              <option value="">使用一般資料</option>
+              {workspaces.map((workspace) => (
+                <option key={workspace.id} value={workspace.id}>
+                  {workspace.name}{workspace.is_default ? "（預設）" : ""}
+                </option>
+              ))}
+            </select>
           </label>
-          <button
-            type="button"
-            onClick={expandPrompt}
-            className="brand-btn-secondary px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={!hasActiveAccess || loadingPrompt}
-          >
-            {loadingPrompt ? "生成中..." : "生成精準提示詞"}
-          </button>
+
+          <label className="block text-sm font-medium">
+            寫作模式
+            <select
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+              value={templateKey}
+              onChange={(e) => onSelectTemplate(e.target.value)}
+            >
+              <option value="">自動判斷</option>
+              {PROMPT_TEMPLATES.map((template) => (
+                <option key={template.key} value={template.key}>
+                  {template.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <label className="block text-sm font-medium">
-          主要提示詞
-          <textarea
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
-            rows={5}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="可手動輸入，或用上方範本/擴寫功能自動帶入"
-          />
-        </label>
-
-        <label className="block text-sm font-medium">
-          主題
+          文章主題
           <input
             className="mt-1 w-full rounded-lg border border-slate-300 p-2"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
+            placeholder="例如：小品牌如何用 AI 建立穩定內容產線"
           />
         </label>
 
         <label className="block text-sm font-medium">
-          大綱
+          大綱或重點
           <textarea
             className="mt-1 w-full rounded-lg border border-slate-300 p-2"
-            rows={6}
+            rows={5}
             value={outline}
             onChange={(e) => setOutline(e.target.value)}
+            placeholder={"可以用條列：\n1. 目前卡在哪\n2. 三個解法\n3. 結尾 CTA"}
           />
         </label>
+
+        <details className="rounded-xl border border-[var(--line)] bg-white/60 p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-[var(--text)]">進階設定：知識庫、提示詞、指定參考檔</summary>
+          <div className="mt-4 space-y-4">
+            <div className="grid md:grid-cols-2 gap-3">
+              <label className="block text-sm font-medium">
+                資料讀取模式
+                <select
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+                  value={dataModeValue}
+                  onChange={(e) => onSelectDataMode(e.target.value)}
+                >
+                  {KNOWLEDGE_CATEGORY_PRESETS.map((preset) => (
+                    <option key={preset.key} value={preset.key}>
+                      {preset.label}
+                    </option>
+                  ))}
+                  <option value="custom">自訂分類</option>
+                </select>
+              </label>
+
+              <label className="block text-sm font-medium">
+                指定參考檔
+                <select
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+                  value={selectedIds[0] || ""}
+                  onChange={(e) => setSelectedIds(e.target.value ? [Number(e.target.value)] : [])}
+                >
+                  <option value="">自動使用預設參考檔</option>
+                  {files.map((file) => (
+                    <option key={file.id} value={file.id}>
+                      {file.file_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium mb-2">自訂資料分類</p>
+              <div className="flex flex-wrap gap-2">
+                {KNOWLEDGE_CATEGORIES.map((category) => (
+                  <button
+                    key={category.key}
+                    type="button"
+                    onClick={() => toggleKnowledgeCategory(category.key)}
+                    className={`rounded-full border px-3 py-1 text-sm transition ${
+                      selectedKnowledgeCategories.includes(category.key)
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                        : "bg-white/80 text-slate-700 border-[var(--line)] hover:bg-emerald-50"
+                    }`}
+                  >
+                    {category.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                只會讀取目前品牌/專案與所選分類資料，不會跨帳號或跨品牌混用。
+              </p>
+            </div>
+
+            {files.length > 1 && (
+              <details className="rounded-lg border border-dashed border-[var(--line)] bg-white/70 p-3">
+                <summary className="cursor-pointer text-sm font-medium">同時指定多份參考檔</summary>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {files.map((file) => (
+                    <button
+                      key={file.id}
+                      type="button"
+                      onClick={() => toggleFile(file.id)}
+                      className={`rounded-full border px-3 py-1 text-sm transition ${
+                        selectedIds.includes(file.id)
+                          ? "border-[#f09a29] bg-[linear-gradient(135deg,#ffbe0b,#ff7b00)] text-white"
+                          : "bg-white/80 text-slate-700 border-[var(--line)] hover:bg-[#fff0c9]"
+                      }`}
+                    >
+                      {file.file_name}
+                    </button>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            <div className="rounded-xl border border-[var(--line)] bg-[linear-gradient(135deg,#fff6da,#ffe2af)] p-4 space-y-2">
+              <label className="block text-sm font-medium">
+                一句話需求
+                <input
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+                  value={promptRequirement}
+                  onChange={(e) => setPromptRequirement(e.target.value)}
+                  placeholder="例如：我要寫給中小企業老闆看的品牌定位教學"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={expandPrompt}
+                className="brand-btn-secondary px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!hasActiveAccess || loadingPrompt}
+              >
+                {loadingPrompt ? "生成中..." : "幫我擴寫提示詞"}
+              </button>
+            </div>
+
+            <label className="block text-sm font-medium">
+              主要提示詞
+              <textarea
+                className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+                rows={5}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="可手動輸入，或用寫作模式/擴寫功能自動帶入"
+              />
+            </label>
+          </div>
+        </details>
+
+        {files.length === 0 && (
+          <p className="rounded-xl border border-dashed border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-slate-600">
+            尚未上傳知識庫檔案。可先生成文章；需要固定風格時，再到個人知識庫上傳 Markdown/TXT。
+          </p>
+        )}
 
         {status && <p className="rounded-xl border border-[var(--line)] bg-[rgba(255,247,221,0.9)] px-4 py-3 text-sm text-slate-700">{status}</p>}
 
         <button
           onClick={generate}
-          className="brand-btn px-4 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="brand-btn w-full px-4 py-3 text-base font-semibold disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
           disabled={!hasActiveAccess || loadingArticle || loadingPrompt}
         >
           {loadingArticle ? "生成中..." : "生成文章"}
@@ -753,7 +932,7 @@ export default function ArticlesPage() {
       </div>
 
       <div className="card-surface p-6 space-y-4">
-        <h3 className="text-lg font-semibold">區塊二：文章編輯區</h3>
+        <h3 className="text-lg font-semibold">編輯文章</h3>
         <textarea
           className="w-full min-h-[360px] rounded-lg border border-slate-300 p-3"
           value={content}
@@ -769,8 +948,9 @@ export default function ArticlesPage() {
         </button>
       </div>
 
-      <div className="card-surface p-6 space-y-4">
-        <h3 className="text-lg font-semibold">區塊三：發布 + 配圖</h3>
+      <details className="card-surface p-6">
+        <summary className="cursor-pointer text-lg font-semibold">配圖、匯出與發布</summary>
+        <div className="mt-4 space-y-4">
 
         <div className="rounded-xl border border-[var(--line)] bg-[linear-gradient(135deg,#fff5d3,#ffdca1)] p-4 space-y-3">
           <p className="text-sm font-semibold text-[var(--text)]">AI 圖片生成（中文文字需求自動走 nano banana）</p>
@@ -986,7 +1166,8 @@ export default function ArticlesPage() {
         )}
 
         {status && <p className="text-sm text-slate-700">{status}</p>}
-      </div>
+        </div>
+      </details>
     </section>
   );
 }

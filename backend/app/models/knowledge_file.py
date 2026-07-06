@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, String, Text
+from sqlalchemy import Boolean, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import BaseModel
@@ -11,6 +11,8 @@ class KnowledgeFile(BaseModel):
     user_id: Mapped[str] = mapped_column(String(64), index=True)
     file_name: Mapped[str] = mapped_column(String(255))
     stored_path: Mapped[str] = mapped_column(String(500), unique=True)
+    workspace_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    category: Mapped[str] = mapped_column(String(80), default="reference_material", index=True)
     content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     file_size: Mapped[int] = mapped_column()
     extracted_text_preview: Mapped[str | None] = mapped_column(Text, nullable=True)

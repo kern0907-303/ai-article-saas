@@ -18,6 +18,28 @@ def _add_column_if_missing(engine: Engine, table: str, column_sql: str, col_name
 
 
 def run_startup_migrations(engine: Engine) -> None:
+    if not _table_exists(engine, "workspaces"):
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE workspaces (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        user_id VARCHAR(64) NOT NULL,
+                        name VARCHAR(120) NOT NULL,
+                        description TEXT,
+                        tone TEXT,
+                        audience TEXT,
+                        notes TEXT,
+                        is_default BOOLEAN DEFAULT 0,
+                        is_active BOOLEAN DEFAULT 1,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+            )
+
     if _table_exists(engine, "users"):
         _add_column_if_missing(engine, "users", "token_version INTEGER DEFAULT 1", "token_version")
 
@@ -40,6 +62,8 @@ def run_startup_migrations(engine: Engine) -> None:
 
     if _table_exists(engine, "articles"):
         _add_column_if_missing(engine, "articles", "generation_error TEXT", "generation_error")
+        _add_column_if_missing(engine, "articles", "workspace_id INTEGER", "workspace_id")
+        _add_column_if_missing(engine, "articles", "knowledge_categories VARCHAR(500)", "knowledge_categories")
 
     if _table_exists(engine, "article_images"):
         _add_column_if_missing(engine, "article_images", "generation_error TEXT", "generation_error")
@@ -54,6 +78,13 @@ def run_startup_migrations(engine: Engine) -> None:
             "knowledge_files",
             "is_default_reference BOOLEAN DEFAULT 1",
             "is_default_reference",
+        )
+        _add_column_if_missing(engine, "knowledge_files", "workspace_id INTEGER", "workspace_id")
+        _add_column_if_missing(
+            engine,
+            "knowledge_files",
+            "category VARCHAR(80) DEFAULT 'reference_material'",
+            "category",
         )
 
     if _table_exists(engine, "plans"):

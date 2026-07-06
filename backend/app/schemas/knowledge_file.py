@@ -8,6 +8,8 @@ class KnowledgeFileOut(BaseModel):
     user_id: str
     file_name: str
     stored_path: str
+    workspace_id: int | None
+    category: str
     content_type: str | None
     file_size: int
     extracted_text_preview: str | None

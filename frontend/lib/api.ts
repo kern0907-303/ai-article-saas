@@ -22,6 +22,7 @@ import {
   Plan,
   Settings,
   Subscription,
+  Workspace,
 } from "@/lib/types";
 
 const REQUEST_TIMEOUT_MS = 90000;
@@ -147,11 +148,36 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  listFiles: () => request<KnowledgeFile[]>("/knowledge-files"),
-  uploadFile: async (file: File, includeAsDefaultReference = true) => {
+  listWorkspaces: () => request<Workspace[]>("/workspaces"),
+  createWorkspace: (payload: {
+    name: string;
+    description?: string;
+    tone?: string;
+    audience?: string;
+    notes?: string;
+    is_default?: boolean;
+  }) => request<Workspace>("/workspaces", { method: "POST", body: JSON.stringify(payload) }),
+
+  listFiles: (filters?: { workspace_id?: number | null; category?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.workspace_id) params.set("workspace_id", String(filters.workspace_id));
+    if (filters?.category) params.set("category", filters.category);
+    const query = params.toString();
+    return request<KnowledgeFile[]>(`/knowledge-files${query ? `?${query}` : ""}`);
+  },
+  uploadFile: async (
+    file: File,
+    options?: {
+      includeAsDefaultReference?: boolean;
+      workspaceId?: number | null;
+      category?: string;
+    },
+  ) => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("include_as_default_reference", String(includeAsDefaultReference));
+    formData.append("include_as_default_reference", String(options?.includeAsDefaultReference ?? true));
+    if (options?.workspaceId) formData.append("workspace_id", String(options.workspaceId));
+    formData.append("category", options?.category || "reference_material");
     return request<KnowledgeFile>("/knowledge-files", { method: "POST", body: formData });
   },
   updateFileDefaultReference: (fileId: number, isDefaultReference: boolean) =>
@@ -172,6 +198,9 @@ export const api = {
     topic: string;
     outline: string;
     selected_file_ids: number[];
+    use_default_references?: boolean;
+    workspace_id?: number | null;
+    knowledge_categories?: string[];
     model?: string;
     prompt?: string;
   }) => request<Article>("/articles/generate", { method: "POST", body: JSON.stringify(payload) }),

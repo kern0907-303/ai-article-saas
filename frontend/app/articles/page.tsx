@@ -916,7 +916,7 @@ export default function ArticlesPage() {
 
         {files.length === 0 && (
           <p className="rounded-xl border border-dashed border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-slate-600">
-            尚未上傳知識庫檔案。可先生成文章；需要固定風格時，再到個人知識庫上傳 Markdown/TXT。
+            尚未上傳知識庫檔案。可先生成文章；需要固定風格時，再到個人知識庫上傳 .md 檔案。
           </p>
         )}
 

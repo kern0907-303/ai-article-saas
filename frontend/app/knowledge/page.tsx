@@ -185,10 +185,10 @@ export default function KnowledgePage() {
         </div>
 
         <label className="block text-sm font-medium text-slate-700">
-          3. 選擇 Markdown/TXT 檔案
+          3. 選擇 Markdown 檔案（.md）
           <input
             type="file"
-            accept=".md,.markdown,.txt,text/markdown,text/plain"
+            accept=".md,.markdown,text/markdown"
             className="mt-2 block w-full rounded-lg border border-slate-300 p-2 disabled:cursor-not-allowed disabled:opacity-60"
             onChange={onUpload}
             disabled={!hasActiveAccess}
@@ -230,7 +230,7 @@ export default function KnowledgePage() {
           </div>
         </details>
 
-        <p className="text-xs text-slate-500">建議一個 skill 或一個主題放一檔；生成時會依目前品牌/專案和分類挑選相關段落。</p>
+        <p className="text-xs text-slate-500">建議把一個 skill 或一個主題整理成一份 .md 檔；生成時會依目前品牌/專案和分類挑選相關段落。</p>
         {status && <p className="text-sm text-slate-600">{status}</p>}
       </div>
 

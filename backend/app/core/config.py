@@ -16,12 +16,18 @@ def _default_runtime_root() -> Path:
 def _default_database_url() -> str:
     configured = os.getenv("DATABASE_URL", "").strip()
     if configured:
-        if configured.startswith("postgres://"):
-            return configured.replace("postgres://", "postgresql://", 1)
-        return configured
+        return _normalize_database_url(configured)
 
     runtime_root = _default_runtime_root()
     return f"sqlite:///{(runtime_root / 'app.db').resolve()}"
+
+
+def _normalize_database_url(value: str) -> str:
+    if value.startswith("postgres://"):
+        return value.replace("postgres://", "postgresql+psycopg://", 1)
+    if value.startswith("postgresql://"):
+        return value.replace("postgresql://", "postgresql+psycopg://", 1)
+    return value
 
 
 def _default_storage_dir() -> Path:
@@ -76,9 +82,7 @@ class AppSettings(BaseSettings):
     def normalize_database_url(cls, value: str) -> str:
         if not isinstance(value, str) or not value.strip():
             return _default_database_url()
-        if isinstance(value, str) and value.startswith("postgres://"):
-            return value.replace("postgres://", "postgresql://", 1)
-        return value
+        return _normalize_database_url(value)
 
     @property
     def persistent_storage_enabled(self) -> bool:

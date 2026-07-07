@@ -59,15 +59,13 @@ async def upload_knowledge_file(
         raise HTTPException(status_code=400, detail="請提供檔案")
 
     _validate_workspace(db, user_id, workspace_id)
-    stored_path, size = await save_uploaded_file(user_id, file)
+    stored_path, size, extracted_text = await save_uploaded_file(user_id, file)
     try:
         require_feature_access(db, int(user_id), feature="knowledge_upload", extra_bytes=size)
     except HTTPException:
         if os.path.exists(stored_path):
             os.remove(stored_path)
         raise
-
-    extracted_text = extract_text_from_file(stored_path)
 
     record = KnowledgeFile(
         user_id=user_id,
@@ -77,6 +75,7 @@ async def upload_knowledge_file(
         category=category,
         content_type=file.content_type,
         file_size=size,
+        extracted_text=extracted_text,
         extracted_text_preview=extracted_text[:500],
         is_active=True,
         is_default_reference=include_as_default_reference,
@@ -115,7 +114,7 @@ def get_knowledge_file_text(
     return {
         "id": record.id,
         "file_name": record.file_name,
-        "text": extract_text_from_file(record.stored_path),
+        "text": extract_text_from_file(record.stored_path, record.extracted_text),
     }
 
 

@@ -15,6 +15,7 @@ class KnowledgeFile(BaseModel):
     category: Mapped[str] = mapped_column(String(80), default="reference_material", index=True)
     content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     file_size: Mapped[int] = mapped_column()
+    extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     extracted_text_preview: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_default_reference: Mapped[bool] = mapped_column(Boolean, default=True)

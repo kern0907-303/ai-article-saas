@@ -118,3 +118,33 @@ def test_rank_knowledge_chunks_respects_character_budget():
     assert ranked
     assert sum(len(item) for item in ranked) <= 180
     assert "ABL" in ranked[0]
+
+
+def test_build_generation_contexts_uses_database_text_when_file_path_is_ephemeral():
+    db = make_session()
+    record = KnowledgeFile(
+        user_id="1",
+        file_name="writing-skill.md",
+        stored_path="/tmp/render-ephemeral-file-is-gone.md",
+        content_type="text/markdown",
+        file_size=64,
+        extracted_text="# 寫作 Skill\n\n## 資料庫保存\nRender 免費版重啟後仍可讀取。",
+        extracted_text_preview="資料庫保存",
+        is_default_reference=True,
+        is_active=True,
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    contexts, used_ids = build_generation_contexts(
+        db,
+        user_id="1",
+        selected_file_ids=[],
+        topic="資料庫保存",
+        outline="說明免費部署方案",
+        user_prompt=None,
+    )
+
+    assert used_ids == [record.id]
+    assert "資料庫保存" in "\n".join(contexts)

@@ -238,7 +238,7 @@ AUTH_ENABLED=true
 NEXT_PUBLIC_AUTH_ENABLED=true
 ```
 
-正式多人 SaaS 必須啟用登入。若 `AUTH_ENABLED=false`，後端會使用同一個本機預設帳號，所有使用者會共用同一份設定、文章與知識庫，不適合公開服務。重新啟用前請先接好持久化資料庫或 Render Persistent Disk，避免帳號再次因部署或重啟消失。
+正式多人 SaaS 必須啟用登入。若 `AUTH_ENABLED=false`，後端會使用同一個本機預設帳號，所有使用者會共用同一份設定、文章與知識庫，不適合公開服務。重新啟用前請先接好持久化資料庫，避免帳號再次因部署或重啟消失。
 
 ## 生產環境資料持久化
 
@@ -246,16 +246,18 @@ NEXT_PUBLIC_AUTH_ENABLED=true
 
 目前後端設定邏輯如下：
 - 若有 `DATABASE_URL`，會使用指定資料庫位置
-- 若設定 `RENDER_DISK_PATH=/var/data`，預設會把 SQLite 放到 `/var/data/ai-article-saas/app.db`
-- `STORAGE_DIR` 建議放在同一個 Persistent Disk，例如 `/var/data/ai-article-saas/storage`
-- 在雲端平台若沒有 Persistent Disk 或外部資料庫，SQLite 檔案很容易在 redeploy 後消失
+- 若沒有 `DATABASE_URL`，會退回 SQLite 檔案
+- 在 Render Free 上，SQLite 檔案與上傳檔案會因 redeploy/restart 消失
+- 知識庫 Markdown 內容會存進資料庫欄位，免費部署時不依賴 Render Disk
 
-目前 Render Blueprint 採用「Persistent Disk + SQLite」方案，避免再新增外部資料庫服務。正式環境至少要設定以下後端環境變數：
+### 免費部署建議：Render Free + 免費 Postgres
+
+Render Free 不支援 Persistent Disk。免費方案請用外部免費 Postgres，例如 Supabase Free 或 Neon Free。Supabase 官方 Free plan 目前提供 500 MB database size 與 1 GB file storage；Neon 官方 Free plan 目前提供 $0、無時間限制、0.5 GB storage。這些額度足夠先做 MVP 與小規模測試。
+
+正式環境至少要設定以下後端環境變數：
 
 ```bash
-RENDER_DISK_PATH=/var/data
-DATABASE_URL=sqlite:////var/data/ai-article-saas/app.db
-STORAGE_DIR=/var/data/ai-article-saas/storage
+DATABASE_URL=postgresql://你的免費Postgres連線字串
 AUTH_ENABLED=true
 JWT_SECRET_KEY=請填固定且夠長的隨機字串，不要重新產生
 ENCRYPTION_SECRET=請填固定密鑰，不要重新產生，否則既有 API Key 會解不開
@@ -283,31 +285,26 @@ NEXT_PUBLIC_AUTH_ENABLED=true
 - 註冊帳號列表
 - 每個帳號的訂閱狀態、文章數、知識庫檔案數與付款筆數
 
-`REQUIRE_PERSISTENT_DATABASE=true` 用於正式環境保護帳號資料。若後端沒有接上 PostgreSQL `DATABASE_URL` 或 Render Persistent Disk，後台會標示帳號資料不安全，服務仍會啟動，避免設定錯誤直接造成網站崩潰。
+`REQUIRE_PERSISTENT_DATABASE=true` 用於正式環境保護帳號資料。若後端沒有接上 PostgreSQL `DATABASE_URL`，後台會標示帳號資料不安全，服務仍會啟動，避免設定錯誤直接造成網站崩潰。
 
-### Render 部署建議：Persistent Disk
+### Render 部署建議：Free Web Service
 
-本 repo 根目錄 `render.yaml` 會建立：
-- 1 個 FastAPI backend 服務
-- 1 個掛載在 `/var/data` 的 Persistent Disk
-- 並把 backend 的 `DATABASE_URL` 固定到 `/var/data/ai-article-saas/app.db`
-- 知識庫檔案、未來圖片檔會保存到 `/var/data/ai-article-saas/storage`
-
-Render Persistent Disk 需要 paid web service，`render.yaml` 目前使用 `plan: starter` 與 `sizeGB: 1`。只有 disk mount path 底下的檔案會跨 deploy/restart 保存。
+本 repo 根目錄 `render.yaml` 會建立 1 個 FastAPI backend 服務，使用 Render Free Web Service。資料持久化交給外部 Postgres，不使用 Render Disk。
 
 部署時只要：
 
 1. 將 repo 連到 Render
 2. 使用 Blueprint / `render.yaml`
-3. 在 Render 後台填入固定的 `JWT_SECRET_KEY`、`ENCRYPTION_SECRET`、`ADMIN_API_KEY`
-4. 把 `CORS_ORIGINS` 改成你的前端網址
-5. 前端 `NEXT_PUBLIC_API_BASE_URL` 指向 Render backend，例如：
+3. 在 Render 後台填入外部 Postgres 的 `DATABASE_URL`
+4. 在 Render 後台填入固定的 `JWT_SECRET_KEY`、`ENCRYPTION_SECRET`、`ADMIN_API_KEY`
+5. 把 `CORS_ORIGINS` 改成你的前端網址
+6. 前端 `NEXT_PUBLIC_API_BASE_URL` 指向 Render backend，例如：
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=https://your-backend.onrender.com/api
 ```
 
-如果舊環境已經有 Render Free Postgres，從 `render.yaml` 移除資料庫不會自動刪除既有資料庫。確認新版本已經改用 Persistent Disk 後，可在 Render Dashboard 手動刪除不用的 Postgres，避免混淆。
+如果舊環境已經有 Render Free Postgres 或其他 Postgres，確認資料已搬到新的 `DATABASE_URL` 後，再刪除不用的舊資料庫，避免混淆。
 
 ### Cloudflare Pages 部署建議：Static Export + Worker Proxy
 

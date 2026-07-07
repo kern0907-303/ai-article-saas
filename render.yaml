@@ -3,20 +3,12 @@ services:
     name: ai-article-saas-backend
     env: python
     rootDir: backend
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    disk:
-      name: ai-article-saas-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
-      - key: RENDER_DISK_PATH
-        value: /var/data
       - key: DATABASE_URL
-        value: sqlite:////var/data/ai-article-saas/app.db
-      - key: STORAGE_DIR
-        value: /var/data/ai-article-saas/storage
+        sync: false
       - key: PYTHON_VERSION
         value: 3.12.8
       - key: AUTH_ENABLED

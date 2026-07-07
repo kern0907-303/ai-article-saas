@@ -195,7 +195,7 @@ def build_generation_contexts(
     records = _candidate_files(db, user_id, selected_file_ids, use_default_references, workspace_id, categories)
     chunks: list[KnowledgeChunk] = []
     for record in records:
-        text = extract_text_from_file(record.stored_path)
+        text = extract_text_from_file(record.stored_path, record.extracted_text)
         chunks.extend(split_knowledge_text(record.file_name, text))
 
     query = "\n".join(part for part in [topic, outline, user_prompt or ""] if part)

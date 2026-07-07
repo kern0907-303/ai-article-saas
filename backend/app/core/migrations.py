@@ -86,6 +86,7 @@ def run_startup_migrations(engine: Engine) -> None:
             "category VARCHAR(80) DEFAULT 'reference_material'",
             "category",
         )
+        _add_column_if_missing(engine, "knowledge_files", "extracted_text TEXT", "extracted_text")
 
     if _table_exists(engine, "plans"):
         _add_column_if_missing(engine, "plans", "is_trial INTEGER DEFAULT 0", "is_trial")

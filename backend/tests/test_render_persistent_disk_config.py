@@ -5,15 +5,16 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RENDER_YAML = REPO_ROOT / "render.yaml"
 
 
-def test_render_blueprint_uses_persistent_disk_sqlite_storage():
+def test_render_blueprint_uses_free_web_service_with_external_database():
     content = RENDER_YAML.read_text(encoding="utf-8")
 
-    assert "disk:" in content
-    assert "mountPath: /var/data" in content
+    assert "plan: free" in content
+    assert "disk:" not in content
     assert "DATABASE_URL" in content
-    assert "sqlite:////var/data/ai-article-saas/app.db" in content
-    assert "STORAGE_DIR" in content
-    assert "/var/data/ai-article-saas/storage" in content
+    database_index = content.index("key: DATABASE_URL")
+    database_block = content[database_index : database_index + 80]
+    assert "sync: false" in database_block
+    assert "sqlite:" not in database_block
     assert "fromDatabase:" not in content
 
 

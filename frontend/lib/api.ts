@@ -20,6 +20,8 @@ import {
   KnowledgeFile,
   ModelCatalogItem,
   Plan,
+  PublicArticle,
+  PublishedArticleSource,
   Settings,
   Subscription,
   Workspace,
@@ -99,6 +101,56 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return res.json();
+}
+
+async function listPublishedArticlesFromDatabase(filters: {
+  ownerId?: string;
+  workspaceId?: string;
+}): Promise<PublicArticle[]> {
+  const ownerId = filters.ownerId || process.env.NEXT_PUBLIC_PUBLIC_ARTICLE_OWNER_ID?.trim();
+  if (!ownerId) {
+    throw new Error("尚未設定公開文章 owner_id");
+  }
+
+  const params = new URLSearchParams({ owner_id: ownerId });
+  const workspaceId = filters.workspaceId || process.env.NEXT_PUBLIC_PUBLIC_ARTICLE_WORKSPACE_ID?.trim();
+  if (workspaceId) params.set("workspace_id", workspaceId);
+
+  const apiBase = resolveApiBase();
+  const res = await fetch(`${apiBase}/public/articles?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`公開文章 API 呼叫失敗（HTTP ${res.status}）`);
+  }
+  return res.json();
+}
+
+async function listPublishedArticlesFromJson(): Promise<PublicArticle[]> {
+  const res = await fetch("/published-articles.json", { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`GitHub JSON 備援讀取失敗（HTTP ${res.status}）`);
+  }
+  const payload = await res.json();
+  return Array.isArray(payload) ? payload : payload.articles || [];
+}
+
+export async function listPublishedArticlesWithFallback(filters: {
+  ownerId?: string;
+  workspaceId?: string;
+} = {}): Promise<{ articles: PublicArticle[]; source: PublishedArticleSource; error?: string }> {
+  try {
+    return {
+      articles: await listPublishedArticlesFromDatabase(filters),
+      source: "database",
+    };
+  } catch (err) {
+    return {
+      articles: await listPublishedArticlesFromJson(),
+      source: "github-json",
+      error: (err as Error).message,
+    };
+  }
 }
 
 export const api = {

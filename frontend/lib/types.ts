@@ -56,6 +56,19 @@ export type Article = {
   publish_social_result?: string;
 };
 
+export type PublicArticle = {
+  id: number;
+  workspace_id?: number | null;
+  topic: string;
+  outline: string;
+  content: string;
+  published_to_website: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PublishedArticleSource = "database" | "github-json";
+
 export type Workspace = {
   id: number;
   user_id: string;

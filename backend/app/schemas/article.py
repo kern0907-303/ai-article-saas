@@ -49,6 +49,19 @@ class ArticleOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PublicArticleOut(BaseModel):
+    id: int
+    workspace_id: int | None
+    topic: str
+    outline: str
+    content: str
+    published_to_website: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class PublishResponse(BaseModel):
     success: bool
     channel: str

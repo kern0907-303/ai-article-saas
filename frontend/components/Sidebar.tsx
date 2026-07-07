@@ -11,6 +11,7 @@ const navItems = [
   { href: "/billing", label: "訂閱與付款" },
   { href: "/knowledge", label: "個人知識庫" },
   { href: "/articles", label: "文章創作與發布" },
+  { href: "/published", label: "公開文章" },
   { href: "/admin", label: "後台儀表板" },
 ];
 

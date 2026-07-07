@@ -131,7 +131,13 @@ Base URL：`http://localhost:8000/api`
 - `POST /publish/website/{article_id}`
 - `POST /publish/social/{article_id}`
 
-目前先回傳模擬成功訊息，並更新文章發布狀態欄位。
+若個人網頁 Endpoint / API Key 都留空，`POST /publish/website/{article_id}` 會直接把文章標記為本系統公開文章，供公開文章頁與備援 JSON 使用。若兩者都有填，系統會先推送到外部網站 API，再標記為公開文章。
+
+公開文章讀取：
+- `GET /public/articles?owner_id={使用者ID}`：讀取指定帳號已發布到網站的文章
+- `GET /public/articles?owner_id={使用者ID}&workspace_id={品牌/專案ID}`：只讀指定品牌/專案的公開文章
+
+公開 API 不會輸出 `user_id`、參考檔案 ID、知識庫分類、AI 模型或其他私有生成欄位。
 
 ### 5) Google Sheets 準備表
 - `GET /google-sheets/destinations`：列出目前使用者的 Google Sheets 目的地
@@ -341,6 +347,36 @@ NEXT_PUBLIC_AUTH_ENABLED=true
 - `https://你的-pages-網域/api/healthz` → Render `/healthz`
 - `https://你的-pages-網域/api/readyz` → Render `/readyz`
 - 其他 `/api/*` → Render `/api/*`
+
+公開文章頁：
+- `https://你的-pages-網域/published`
+- 正式資料來源：Render backend `/api/public/articles`
+- 備援資料來源：GitHub 內的 `frontend/public/published-articles.json`
+
+Cloudflare Pages 需要新增以下環境變數，公開文章頁才知道要讀哪個帳號，不會把不同帳號的文章混在一起：
+
+```bash
+NEXT_PUBLIC_PUBLIC_ARTICLE_OWNER_ID=你的使用者ID
+# 可選，只顯示某一個品牌/專案：
+NEXT_PUBLIC_PUBLIC_ARTICLE_WORKSPACE_ID=你的品牌或專案ID
+```
+
+若不想用環境變數，也可以用網址指定：
+
+```txt
+https://你的-pages-網域/published?owner_id=你的使用者ID
+https://你的-pages-網域/published?owner_id=你的使用者ID&workspace_id=你的品牌或專案ID
+```
+
+匯出 GitHub JSON 備援檔：
+
+```bash
+python3 scripts/export_public_articles.py --owner-id 你的使用者ID
+# 只匯出某品牌/專案：
+python3 scripts/export_public_articles.py --owner-id 你的使用者ID --workspace-id 你的品牌或專案ID
+```
+
+這個指令只會匯出已按「發布至個人網頁」且有內容的公開文章，不會匯出知識庫、API Key、未發布草稿或其他帳號資料。
 
 正式部署後請跑：
 

@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import articles, auth, billing, google_sheets, images, knowledge_files, publish, settings, workspaces
+from app.api import articles, auth, billing, google_sheets, images, knowledge_files, public_articles, publish, settings, workspaces
 from app.core.config import settings as app_settings
 from app.core.database import get_database_init_status, start_database_initialization_in_background
 
@@ -103,6 +103,7 @@ app.include_router(settings.router, prefix=app_settings.api_prefix)
 app.include_router(workspaces.router, prefix=app_settings.api_prefix)
 app.include_router(knowledge_files.router, prefix=app_settings.api_prefix)
 app.include_router(articles.router, prefix=app_settings.api_prefix)
+app.include_router(public_articles.router, prefix=app_settings.api_prefix)
 app.include_router(images.router, prefix=app_settings.api_prefix)
 app.include_router(google_sheets.router, prefix=app_settings.api_prefix)
 app.include_router(publish.router, prefix=app_settings.api_prefix)

@@ -8,7 +8,12 @@ import Sidebar from "@/components/Sidebar";
 import { isAuthEnabled } from "@/lib/auth-config";
 import { getToken } from "@/lib/auth";
 
-const PUBLIC_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password"];
+const AUTH_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password"];
+const PUBLIC_ROUTES = [...AUTH_ROUTES, "/published"];
+
+function matchesRoute(pathname: string, routes: string[]) {
+  return routes.some((route) => pathname === route || pathname === `${route}.html` || pathname.startsWith(`${route}/`));
+}
 
 export default function AuthShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -17,7 +22,8 @@ export default function AuthShell({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
 
-  const isPublicRoute = useMemo(() => PUBLIC_ROUTES.includes(pathname), [pathname]);
+  const isAuthRoute = useMemo(() => matchesRoute(pathname, AUTH_ROUTES), [pathname]);
+  const isPublicRoute = useMemo(() => matchesRoute(pathname, PUBLIC_ROUTES), [pathname]);
 
   useEffect(() => {
     setHydrated(true);
@@ -28,7 +34,7 @@ export default function AuthShell({ children }: { children: ReactNode }) {
     if (!hydrated) return;
 
     if (!isAuthEnabled()) {
-      if (isPublicRoute) {
+      if (isAuthRoute) {
         setRedirecting(true);
         router.replace("/settings");
         return;
@@ -43,14 +49,14 @@ export default function AuthShell({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (token && isPublicRoute) {
+    if (token && isAuthRoute) {
       setRedirecting(true);
       router.replace("/settings");
       return;
     }
 
     setRedirecting(false);
-  }, [hydrated, token, isPublicRoute, router]);
+  }, [hydrated, token, isAuthRoute, isPublicRoute, router]);
 
   if (!hydrated || redirecting) {
     return <div className="flex min-h-screen items-center justify-center text-[var(--text-soft)]">載入中...</div>;

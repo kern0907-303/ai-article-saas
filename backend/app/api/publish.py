@@ -46,6 +46,21 @@ def _require_publish_config(setting: Setting, channel: str) -> tuple[str, str]:
     return endpoint, api_key
 
 
+def _optional_website_publish_config(setting: Setting) -> tuple[str, str] | None:
+    endpoint = (setting.website_endpoint or "").strip()
+    api_key = (decrypt_text(setting.website_api_key_encrypted) or setting.website_api_key or "").strip()
+    if not endpoint and not api_key:
+        return None
+    if not endpoint or not api_key:
+        raise HTTPException(status_code=400, detail="個人網頁 Endpoint 與 API Key 需要同時設定，或兩者都留空")
+    return endpoint, api_key
+
+
+def _ensure_article_has_content(article: Article) -> None:
+    if not (article.content or "").strip():
+        raise HTTPException(status_code=400, detail="文章內容是空的，請先生成或儲存文章內容再發布")
+
+
 def _send_publish_request(endpoint: str, api_key: str, article: Article, channel: str) -> str:
     payload = {
         "article_id": article.id,
@@ -84,9 +99,14 @@ def publish_to_website(
     user_id: str = Depends(get_current_user_id),
 ):
     article = _get_article(db, article_id, user_id)
+    _ensure_article_has_content(article)
     setting = _get_user_settings(db, user_id)
-    endpoint, api_key = _require_publish_config(setting, "website")
-    publish_result = _send_publish_request(endpoint, api_key, article, "website")
+    config = _optional_website_publish_config(setting)
+    if config is None:
+        publish_result = "已發布到公開文章資料庫"
+    else:
+        endpoint, api_key = config
+        publish_result = _send_publish_request(endpoint, api_key, article, "website")
     article.published_to_website = True
     article.publish_website_result = publish_result
     db.commit()
